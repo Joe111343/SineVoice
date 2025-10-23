@@ -1,0 +1,1954 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SineVoice - 平假名歌聲合成器 v3.0.4</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* ------------------------ 平假名歌聲合成器 v3.0.8 (MIDI寬鬆化) ------------------------ */
+body {
+    font-family: 'Inter', sans-serif;
+    padding: 10px;
+    background: #f0f4f8;
+    user-select: none;
+    line-height: 1.4;
+}
+h2 {
+    color: #1e3a8a;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+#rollContainer {
+    width: 100%;
+    max-width: 900px;
+    height: 300px;
+    overflow-x: scroll;
+    border: 2px solid #93c5fd;
+    background: #fff;
+    cursor: grab;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    scrollbar-width: none; /* Firefox */
+}
+#rollContainer::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+}
+canvas {
+    background: #fff;
+    display: block;
+    cursor: default;
+}
+#controls {
+    max-width: 900px;
+    margin-bottom: 20px;
+}
+.button-group {
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+#controls input:not([type="file"]), #controls select {
+    padding: 6px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 80px;
+    margin-right: 5px;
+}
+#controls button {
+    background-color: #3b82f6;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin: 3px;
+}
+#controls button:hover:not(:disabled) {
+    opacity: 0.9;
+}
+#controls button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+}
+#status {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    background: #dbeafe;
+    color: #1e3a8a;
+    font-size: 14px;
+}
+/* ✅ 新增：自訂滑動條樣式 */
+#pianoRollScrollbar {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #e5e7eb;
+    outline: none;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+#pianoRollScrollbar:hover {
+    background: #d1d5db;
+}
+#pianoRollScrollbar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 25px;
+    height: 15px;
+    background: #60a5fa;
+    cursor: pointer;
+    border-radius: 4px;
+}
+#pianoRollScrollbar::-moz-range-thumb {
+    width: 25px;
+    height: 15px;
+    background: #60a5fa;
+    cursor: pointer;
+    border-radius: 4px;
+}
+@media (max-width: 768px) {
+    #rollContainer {
+        height: 250px;
+    }
+    #controls input:not([type="file"]), #controls select {
+        width: 60px;
+    }
+}
+</style>
+</head>
+<body>
+<div class="max-w-4xl mx-auto">
+    <h2 class="text-xl">SineVoice - 平假名歌聲合成器 v3.0.4</h2>
+    <p class="text-sm text-green-700 font-semibold mb-4">SineVoice！從一條正弦波，唱出整個世界。
+</p>
+    <div id="controls">
+        <div class="button-group">
+            <h4 class="font-bold text-gray-700 mb-2">音符手動加入 (羅馬拼音/平假名皆可)</h4>
+            <div class="flex flex-wrap items-center space-y-2 md:space-y-0 md:space-x-4">
+                <label class="text-sm">音節:</label>
+                <input type="text" id="textInput" size="20" placeholder="ka ki ku 或 か き く" class="flex-grow w-full md:w-auto p-2">
+                
+                <label class="text-sm">音高(Hz):</label>
+                <input type="number" id="baseFreq" value="500" min="50" max="1000" style="width:70px;">
+            </div>
+            <div class="mt-3 flex flex-wrap items-center space-y-2 md:space-y-0 md:space-x-4">
+                <label class="text-sm">時長(s):</label>
+                <input type="number" id="durInput" value="0.5" step="0.1" min="0.1" style="width:70px;">
+                
+                <label class="text-sm">間隔(s):</label>
+                <input type="number" id="gapInput" value="0.1" step="0.05" min="0" style="width:70px;">
+                <label class="text-sm">顫音頻率(Hz):</label> 
+                <input type="number" id="vibratoRateInput" value="5" step="0.5" min="0" style="width:70px;">
+                
+                <label class="text-sm">顫音深度(Hz):</label> 
+                <input type="number" id="vibratoDepthInput" value="10" step="1" min="0" style="width:70px;">
+                <button id="addBtn">加入音符</button>
+            </div>
+            <p class="text-xs text-red-700 mt-2">**此版本**改進了 MIDI 導入，能更寬鬆地處理多軌和添加人聲化音高滑動。</p>
+        </div>
+        <div class="button-group">
+            <h4 class="font-bold text-gray-700 mb-2">播放與工具 (需等待渲染完成)</h4>
+            <!-- 5種自動音高按鈕（區分顏色） -->
+            <button id="autoPitchBtn" data-style="default" class="bg-purple-500 hover:bg-purple-600">自动音高（默认）</button>
+            <button id="autoPitchNaturalBtn" data-style="natural" class="bg-green-500 hover:bg-green-600">自然人声</button>
+            <button id="autoPitchRobotBtn" data-style="robot" class="bg-pink-500 hover:bg-pink-600">电音机器人</button>
+            <button id="autoPitchStaccatoBtn" data-style="staccato" class="bg-orange-500 hover:bg-orange-600">快速断奏</button>
+            <button id="autoPitchHarmonyBtn" data-style="harmony" class="bg-teal-500 hover:bg-teal-600">多轨和声</button>
+            <!-- 原有按鈕保留 -->
+            <button id="renderBtn">渲染音訊</button>
+            <button id="playBtn">播放 (需渲染)</button>
+            <button id="downloadBtn" class="bg-emerald-500 hover:bg-emerald-600">下載 WAV</button>
+            <button id="clearBtn" class="bg-red-500 hover:bg-red-600">清空</button>
+        </div>
+        <div class="button-group">
+            <h4 class="font-bold text-gray-700 mb-2">MIDI 導入 (實體解析)</h4>
+            <input type="file" id="midiFileInput" accept=".mid,.midi">
+            <input type="text" id="midiLyrics" size="20" placeholder="一行歌詞 (例如: a i u e o 或 あ い う え お)" class="p-2 border rounded">
+            <button id="importMidiBtn" class="bg-yellow-500 hover:bg-yellow-600">導入 MIDI</button>
+        </div>
+        
+        <div class="button-group">
+            <h4 class="font-bold text-gray-700 mb-2">專案儲存與載入 (JSON .sine 格式)</h4>
+            <button id="saveBtn" class="bg-blue-500 hover:bg-blue-600">儲存 (.sine)</button>
+            <input type="file" id="loadFileInput" accept=".sine" class="hidden">
+            <button id="loadBtn" class="bg-indigo-500 hover:bg-indigo-600">載入 (.sine)</button>
+        </div>
+        <div id="status">準備就緒 (首次變更音符後會進行渲染)</div>
+    <label>音高風格:
+    <select id="pitchStyleSelect">
+        <option value="default">標準</option>
+        <option value="natural">人聲化</option>
+        <option value="robot">機器人</option>
+        <option value="staccato">斷奏</option>
+        <option value="harmony">和聲</option>
+        <option value="auto">自動智能</option> <!-- 新增這一行 -->
+    </select>
+    <button onclick="applyPitchStyle(document.getElementById('pitchStyleSelect').value)">套用風格</button>
+</label></div>
+<div class="flex items-center space-x-2">
+    <label for="chineseMode" class="text-sm font-medium text-gray-700">啟用中文拼音模式</label>
+    <input type="checkbox" id="chineseMode" class="form-checkbox h-4 w-4 text-indigo-600 transition duration-150 ease-in-out">
+</div>
+</div>
+<div id="rollContainer" class="mx-auto">
+    <canvas id="roll" width="800" height="300"></canvas>
+</div>
+<div class="max-w-4xl mx-auto mt-2">
+    <input type="range" id="pianoRollScrollbar" class="w-full" value="0">
+</div>
+<div id="noteEditor" class="max-w-4xl mx-auto button-group hidden mt-4">
+    <h4 class="font-bold text-gray-700 mb-2">選定音符顫音設定與音高編輯 (點擊曲線進行編輯)</h4>
+    <div class="flex flex-wrap items-center space-y-2 md:space-y-0 md:space-x-4">
+        <button id="vibratoToggleBtn" class="bg-gray-400">顫音: 關</button>
+        <div>
+            <label class="text-sm">頻率(Hz):</label>
+            <input type="number" id="noteVibratoRate" step="0.5" min="0" style="width:70px;" disabled>
+        </div>
+        <div>
+            <label class="text-sm">深度(Hz):</label>
+            <input type="number" id="noteVibratoDepth" step="1" min="0" style="width:70px;" disabled>
+        </div>
+        <button id="deleteNoteBtn" class="bg-red-700 hover:bg-red-800">刪除音符</button>
+    </div>
+</div>
+<script>
+// -------------------------------------------------------------------
+// 平假名歌聲合成器 v3.0.4 (5種自動音高整合版)
+// -------------------------------------------------------------------
+// --- DOM 元素 ---
+const rollContainer = document.getElementById('rollContainer');
+const canvas = document.getElementById('roll');
+const ctx = canvas.getContext('2d');
+const statusDiv = document.getElementById('status');
+const textInput = document.getElementById('textInput');
+const baseFreqInput = document.getElementById('baseFreq');
+const durInput = document.getElementById('durInput');
+const gapInput = document.getElementById('gapInput');
+const vibratoRateInput = document.getElementById('vibratoRateInput');
+const vibratoDepthInput = document.getElementById('vibratoDepthInput');
+const addBtn = document.getElementById('addBtn');
+const playBtn = document.getElementById('playBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearBtn = document.getElementById('clearBtn');
+const midiFileInput = document.getElementById('midiFileInput');
+const midiLyricsInput = document.getElementById('midiLyrics'); 
+const importMidiBtn = document.getElementById('importMidiBtn');
+const renderBtn = document.getElementById('renderBtn');
+const autoPitchBtn = document.getElementById('autoPitchBtn');
+const autoPitchNaturalBtn = document.getElementById('autoPitchNaturalBtn');
+const autoPitchRobotBtn = document.getElementById('autoPitchRobotBtn');
+const autoPitchStaccatoBtn = document.getElementById('autoPitchStaccatoBtn');
+const autoPitchHarmonyBtn = document.getElementById('autoPitchHarmonyBtn');
+const noteEditor = document.getElementById('noteEditor');
+const vibratoToggleBtn = document.getElementById('vibratoToggleBtn');
+const noteVibratoRateInput = document.getElementById('noteVibratoRate');
+const noteVibratoDepthInput = document.getElementById('noteVibratoDepth');
+const pianoRollScrollbar = document.getElementById('pianoRollScrollbar');
+const saveBtn = document.getElementById('saveBtn');
+const loadBtn = document.getElementById('loadBtn');
+const loadFileInput = document.getElementById('loadFileInput');
+const deleteNoteBtn = document.getElementById('deleteNoteBtn'); // 新增刪除按鈕
+// --- 繪圖與音符核心變數 ---
+const PITCH_POINTS_COUNT = 50;
+const MIN_TIME_STEP_MS = 5;
+let rollWidthPerSecond = 200;
+const minFreq = 10;
+const maxFreq = 2000;
+const freqRange = maxFreq - minFreq;
+let notes = [];
+let totalDuration = 5;
+// --- 渲染和播放狀態 ---
+let audioCtx = null;
+let renderedAudioBuffer = null;
+let isRendering = false;
+let currentSource = null;
+// --- 繪圖和互動相關 ---
+let currentRollWidth = canvas.width;
+let isDraggingRoll = false;
+let startDragX = 0;
+let startScrollLeft = 0;
+let selectedNote = null;
+let dragMode = null; // 'drawPitch' for drawing pitch curve
+let activePitchPoint = null; // 正在拖動的音高點
+// ------------------------
+// 1. 羅馬拼音/平假名映射和分解 (無變動)
+// ------------------------
+const romajiToKana = {
+    'a': 'あ', 'i': 'い', 'u': 'う', 'e': 'え', 'o': 'お',
+    'ka': 'か', 'ki': 'き', 'ku': 'く', 'ke': 'け', 'ko': 'こ',
+    'sa': 'さ', 'shi': 'し', 'su': 'す', 'se': 'せ', 'so': 'そ',
+    'ta': 'た', 'chi': 'ち', 'tsu': 'つ', 'te': 'て', 'to': 'と',
+    'na': 'な', 'ni': 'に', 'nu': 'ぬ', 'ne': 'ね', 'no': 'の',
+    'ha': 'は', 'hi': 'ひ', 'fu': 'ふ', 'he': 'へ', 'ho': 'ほ',
+    'ma': 'ま', 'mi': 'み', 'mu': 'む', 'me': 'め', 'mo': 'も',
+    'ya': 'や', 'yu': 'ゆ', 'yo': 'よ',
+    'ra': 'ら', 'ri': 'り', 'ru': 'る', 're': 'れ', 'ro': 'ろ',
+    'wa': 'わ', 'wo': 'を',
+    'n': 'ん', 'nn': 'ん',
+
+    // 濁音
+    'ga': 'が', 'gi': 'ぎ', 'gu': 'ぐ', 'ge': 'げ', 'go': 'ご',
+    'za': 'ざ', 'ji': 'じ', 'zu': 'ず', 'ze': 'ぜ', 'zo': 'ぞ',
+    'da': 'だ', 'di': 'ぢ', 'du': 'づ', 'de': 'で', 'do': 'ど',
+    'ba': 'ば', 'bi': 'び', 'bu': 'ぶ', 'be': 'べ', 'bo': 'ぼ',
+
+    // 半濁音
+    'pa': 'ぱ', 'pi': 'ぴ', 'pu': 'ぷ', 'pe': 'ぺ', 'po': 'ぽ',
+
+    // 拗音 (yōon)
+    'kya': 'きゃ', 'kyu': 'きゅ', 'kyo': 'きょ',
+    'sha': 'しゃ', 'shu': 'しゅ', 'sho': 'しょ',
+    'cha': 'ちゃ', 'chu': 'ちゅ', 'cho': 'ちょ',
+    'nya': 'にゃ', 'nyu': 'にゅ', 'nyo': 'にょ',
+    'hya': 'ひゃ', 'hyu': 'ひゅ', 'hyo': 'ひょ',
+    'mya': 'みゃ', 'myu': 'みゅ', 'myo': 'みょ',
+    'rya': 'りゃ', 'ryu': 'りゅ', 'ryo': 'りょ',
+
+    // 濁拗音
+    'gya': 'ぎゃ', 'gyu': 'ぎゅ', 'gyo': 'ぎょ',
+    'ja': 'じゃ', 'ju': 'じゅ', 'jo': 'じょ',
+    'bya': 'びゃ', 'byu': 'びゅ', 'byo': 'びょ',
+    // 拗半濁音
+    'pya': 'ぴゃ', 'pyu': 'ぴゅ', 'pyo': 'ぴょ',
+
+    // 小元音/非標准輸入
+    'xa': 'ぁ', 'xi': 'ぃ', 'xu': 'ぅ', 'xe': 'ぇ', 'xo': 'ぉ',
+    'la': 'ぁ', 'li': 'ぃ', 'lu': 'ぅ', 'le': 'ぇ', 'lo': 'ぉ',
+    'xya': 'ゃ', 'xyu': 'ゅ', 'xyo': 'ょ',
+    'lya': 'ゃ', 'lyu': 'ゅ', 'lyo': 'ょ',
+    'xtsu': 'っ', 'ltu': 'っ',
+
+    // 促音 (Sokuon) - 重複子音（這是歌詞轉換中最容易「消失」的部分）
+    'kka': 'っか', 'kki': 'っき', 'kku': 'っく', 'kke': 'っけ', 'kko': 'っこ',
+    'ssa': 'っさ', 'sshi': 'っし', 'ssu': 'っす', 'sse': 'っせ', 'sso': 'っそ',
+    'tta': 'った', 'cchi': 'っち', 'ttsu': 'っつ', 'tte': 'って', 'tto': 'っと',
+    'hha': 'っは', 'hhi': 'っひ', 'hfu': 'っふ', 'hhe': 'っへ', 'hho': 'っほ',
+    'mma': 'っま', 'mmi': 'っみ', 'mmu': 'っむ', 'mme': 'っめ', 'mmo': 'っも',
+    'rra': 'っら', 'rri': 'っり', 'rru': 'っる', 'rre': 'っれ', 'rro': 'っろ',
+    'ppa': 'っぱ', 'ppi': 'っぴ', 'ppu': 'っぷ', 'ppe': 'っぺ', 'ppo': 'っぽ',
+    'jja': 'っじゃ', 'jju': 'っじゅ', 'jjo': 'っじょ', // 濁音的促音
+    'ssha': 'っしゃ', 'sshu': 'っしゅ', 'ssho': 'っしょ', // 拗音的促音
+    'ccha': 'っちゃ', 'cchu': 'っちゅ', 'ccho': 'っちょ',
+    
+    // 濁音/半濁音的促音，需要更長的匹配
+    'ggu': 'っぐ', // 範例：baggu -> ばっぐ
+    'bbu': 'っぶ', // 範例：kabbu -> かっぶ
+    'ddu': 'っづ', // 範例：hoddo -> ほっど
+    'zua': 'っざ', // 範例：kizze -> きっぜ
+
+    // 外來語（常用於歌詞）
+    'we': 'ゑ', 'wi': 'ゐ', 
+    'ye': 'いぇ', 
+    'va': 'ゔぁ', 'vi': 'ゔぃ', 'vu': 'ゔ', 've': 'ゔぇ', 'vo': 'ゔぉ',
+
+    // 長音、促音
+    '-': 'ー',
+    '': 'っ', // 這個鍵值必須是空的，交給邏輯處理
+};
+
+// ... (pinyinToChinese 和 keysSorted 保持不變，但請注意 keysSorted 應使用新的 romajiToKana)
+
+const pinyinToChinese = {
+    // A
+    'a': '啊', 'ai': '愛', 'an': '安', 'ang': '昂', 'ao': '奧',
+
+    // B
+    'ba': '把', 'bai': '白', 'ban': '半', 'bang': '幫', 'bao': '包', 'bei': '北', 'ben': '本', 'beng': '蹦', 'bi': '比', 'bian': '變', 'biao': '表', 'bie': '別', 'bin': '賓', 'bing': '冰', 'bo': '播', 'bu': '不',
+
+    // C
+    'ca': '擦', 'cai': '才', 'can': '餐', 'cang': '倉', 'cao': '操', 'ce': '側', 'cen': '參', 'ceng': '層',
+    'cha': '茶', 'chai': '柴', 'chan': '產', 'chang': '長', 'chao': '超', 'che': '車', 'chen': '陳', 'cheng': '城', 'chi': '吃', 'chong': '蟲', 'chou': '抽', 'chu': '出', 'chua': '欻', 'chuai': '揣', 'chuan': '川', 'chuang': '窗', 'chui': '吹', 'chun': '春', 'chuo': '綽',
+    'ci': '詞', 'cong': '從', 'cou': '湊', 'cu': '促', 'cuan': '竄', 'cui': '脆', 'cun': '存', 'cuo': '錯',
+
+    // D
+    'da': '大', 'dai': '代', 'dan': '單', 'dang': '當', 'dao': '導', 'de': '的', 'dei': '得', 'deng': '等', 'di': '地', 'dian': '點', 'diao': '掉', 'die': '跌', 'ding': '定', 'diu': '丟', 'dong': '東', 'dou': '都', 'du': '讀', 'duan': '段', 'dui': '對', 'dun': '頓', 'duo': '多',
+
+    // E
+    'e': '餓', 'ei': '欸', 'en': '恩', 'eng': '鞥', 'er': '兒',
+
+    // F
+    'fa': '法', 'fan': '飯', 'fang': '方', 'fei': '飛', 'fen': '分', 'feng': '風', 'fo': '佛', 'fou': '否', 'fu': '副',
+
+    // G
+    'ga': '嘎', 'gai': '該', 'gan': '幹', 'gang': '剛', 'gao': '高', 'ge': '哥', 'gei': '給', 'gen': '跟', 'geng': '更', 'gong': '工', 'gou': '溝', 'gu': '古', 'gua': '瓜', 'guai': '乖', 'guan': '關', 'guang': '光', 'gui': '貴', 'gun': '滾', 'guo': '國',
+
+    // H
+    'ha': '哈', 'hai': '海', 'han': '漢', 'hang': '航', 'hao': '好', 'he': '河', 'hei': '黑', 'hen': '很', 'heng': '哼', 'hong': '紅', 'hou': '後', 'hu': '湖', 'hua': '花', 'huai': '懷', 'huan': '還', 'huang': '黃', 'hui': '會', 'hun': '混', 'huo': '火',
+
+    // J
+    'ji': '機', 'jia': '家', 'jian': '見', 'jiang': '將', 'jiao': '叫', 'jie': '姐', 'jin': '進', 'jing': '經', 'jiong': '炯', 'jiu': '久', 'ju': '居', 'juan': '捲', 'jue': '覺', 'jun': '軍',
+
+    // K
+    'ka': '卡', 'kai': '開', 'kan': '看', 'kang': '康', 'kao': '考', 'ke': '課', 'ken': '肯', 'keng': '坑', 'kong': '空', 'kou': '口', 'ku': '苦', 'kua': '誇', 'kuai': '快', 'kuan': '寬', 'kuang': '況', 'kui': '虧', 'kun': '困', 'kuo': '闊',
+
+    // L
+    'la': '拉', 'lai': '來', 'lan': '蘭', 'lang': '朗', 'lao': '老', 'le': '樂', 'lei': '雷', 'leng': '冷', 'li': '力', 'lia': '倆', 'lian': '連', 'liang': '兩', 'liao': '聊', 'lie': '列', 'lin': '林', 'ling': '零', 'liu': '流', 'long': '龍', 'lou': '樓', 'lu': '路', 'lv': '驢', 'luan': '亂', 'lue': '略', 'lun': '論', 'luo': '羅',
+
+    // M
+    'ma': '媽', 'mai': '賣', 'man': '滿', 'mang': '忙', 'mao': '貓', 'me': '麼', 'mei': '美', 'men': '門', 'meng': '夢', 'mi': '米', 'mian': '面', 'miao': '秒', 'mie': '滅', 'min': '民', 'ming': '明', 'miu': '謬', 'mo': '摸', 'mou': '某', 'mu': '目',
+
+    // N
+    'na': '拿', 'nai': '奶', 'nan': '南', 'nang': '囊', 'nao': '腦', 'ne': '呢', 'nei': '內', 'nen': '嫩', 'neng': '能', 'ni': '你', 'nian': '年', 'niang': '娘', 'niao': '鳥', 'nin': '您', 'ning': '寧', 'niu': '牛', 'nong': '農', 'nu': '努', 'nv': '女', 'nuan': '暖', 'nue': '虐',
+
+    // O
+    'o': '哦', 'ou': '歐',
+
+    // P
+    'pa': '怕', 'pai': '排', 'pan': '盤', 'pang': '旁', 'pao': '跑', 'pei': '陪', 'pen': '盆', 'peng': '朋', 'pi': '皮', 'pian': '片', 'piao': '票', 'pie': '撇', 'pin': '品', 'ping': '平', 'po': '破', 'pou': '剖', 'pu': '普',
+
+    // Q
+    'qi': '七', 'qia': '洽', 'qian': '千', 'qiang': '強', 'qiao': '橋', 'qie': '切', 'qin': '親', 'qing': '清', 'qiong': '窮', 'qiu': '秋', 'qu': '去', 'quan': '全', 'que': '缺', 'qun': '群',
+
+    // R
+    'ran': '然', 'rang': '讓', 'rao': '饒', 're': '熱', 'ren': '人', 'reng': '扔', 'ri': '日', 'rong': '容', 'rou': '肉', 'ru': '入', 'rua': '挼', 'ruai': '搋', 'ruan': '軟', 'rui': '銳', 'run': '閏', 'ruo': '若',
+
+    // S
+    'sa': '撒', 'sai': '塞', 'san': '三', 'sang': '桑', 'sao': '掃', 'se': '色', 'sen': '森', 'seng': '僧',
+    'sha': '沙', 'shai': '曬', 'shan': '山', 'shang': '上', 'shao': '少', 'she': '舌', 'shei': '誰', 'shen': '深', 'sheng': '生', 'shi': '師', 'shou': '手', 'shu': '書', 'shua': '刷', 'shuai': '帥', 'shuan': '拴', 'shuang': '雙', 'shui': '水', 'shun': '順', 'shuo': '說',
+    'si': '思', 'song': '送', 'sou': '搜', 'su': '速', 'suan': '酸', 'sui': '歲', 'sun': '孫', 'suo': '所',
+
+    // T
+    'ta': '她', 'tai': '太', 'tan': '談', 'tang': '唐', 'tao': '套', 'te': '特', 'teng': '疼', 'ti': '提', 'tian': '天', 'tiao': '條', 'tie': '鐵', 'ting': '聽', 'tong': '通', 'tou': '頭', 'tu': '圖', 'tuan': '團', 'tui': '推', 'tun': '吞', 'tuo': '脫',
+
+    // W
+    'wa': '挖', 'wai': '外', 'wan': '完', 'wang': '王', 'wei': '位', 'wen': '問', 'weng': '翁', 'wo': '我', 'wu': '五',
+
+    // X
+    'xi': '西', 'xia': '下', 'xian': '先', 'xiang': '香', 'xiao': '小', 'xie': '謝', 'xin': '新', 'xing': '星', 'xiong': '熊', 'xiu': '修', 'xu': '許', 'xuan': '選', 'xue': '學', 'xun': '訊',
+
+    // Y
+    'ya': '壓', 'yan': '言', 'yang': '羊', 'yao': '要', 'ye': '也', 'yi': '一', 'yin': '音', 'ying': '英', 'yong': '用', 'you': '有', 'yu': '雨', 'yuan': '遠', 'yue': '月', 'yun': '雲',
+
+    // Z
+    'za': '雜', 'zai': '再', 'zan': '暫', 'zang': '髒', 'zao': '早', 'ze': '責', 'zei': '賊', 'zen': '怎', 'zeng': '增',
+    'zha': '炸', 'zhai': '摘', 'zhan': '戰', 'zhang': '張', 'zhao': '照', 'zhe': '這', 'zhen': '真', 'zheng': '正', 'zhi': '只', 'zhong': '中', 'zhou': '周', 'zhu': '主', 'zhua': '抓', 'zhuai': '拽', 'zhuan': '轉', 'zhuang': '壯', 'zhui': '追', 'zhun': '準', 'zhuo': '桌',
+    'zi': '子', 'zong': '總', 'zou': '走', 'zu': '組', 'zuan': '鑽', 'zui': '最', 'zun': '遵', 'zuo': '做'
+};
+
+const keysSorted = Object.keys(romajiToKana).sort((a,b)=>b.length-a.length);
+const specialKanaMap = {
+    // 小元音
+    'ぁ': '小元音', 'ぃ': '小元音', 'ぅ': '小元音', 'ぇ': '小元音', 'ぉ': '小元音',
+    // 拗音
+    'きゃ': '拗音', 'きゅ': '拗音', 'きょ': '拗音',
+    'しゃ': '拗音', 'しゅ': '拗音', 'しょ': 'しょ',
+    'ちゃ': '拗音', 'ちゅ': 'ちゅ', 'ちょ': 'ちょ',
+    'にゃ': '拗音', 'にゅ': 'にゅ', 'にょ': 'にょ',
+    'ひゃ': '拗音', 'ひゅ': 'ひゅ', 'ひょ': 'ひょ',
+    'みゃ': '拗音', 'みゅ': 'みゅ', 'みょ': 'みょ',
+    'りゃ': '拗音', 'りゅ': 'りゅ', 'りょ': 'りょ',
+    'ぎゃ': '拗音', 'ぎゅ': 'ぎゅ', 'ぎょ': 'ぎょ',
+    'じゃ': '拗音', 'じゅ': 'じゅ', 'じょ': 'じょ',
+    'びゃ': '拗音', 'びゅ': 'びゅ', 'びょ': 'びょ',
+    'ぴゃ': '拗音', 'ぴゅ': 'ぴゅ', 'ぴょ': 'ぴょ',
+    // 小的「や」「ゆ」「よ」
+    'ゃ': '小y音', 'ゅ': '小y音', 'ょ': '小y音',
+    // 促音、長音、撥音
+    'っ': '促音',
+    'ー': '長音',
+    'ん': '撥音',
+    // 其他
+    'ゐ': '舊假名', 'ゑ': '舊假名', 'ゔ': '外來語',
+};
+function parseText(input) {
+    let text = input.toLowerCase().trim();
+    const finalUnits = [];
+    let tempInput = text;
+    while(tempInput.length > 0){
+        let matched = false;
+        for(const k of keysSorted){
+            if(tempInput.startsWith(k)){
+                const kana = romajiToKana[k];
+                if (['a','i','u','e','o'].includes(k) || k === 'n' || k === 'nn') {
+                    finalUnits.push(k === 'nn' ? 'n' : k); 
+                } else if (specialKanaMap[kana]) {
+                    finalUnits.push(kana); 
+                } else {
+                    finalUnits.push(k); 
+                }
+                tempInput = tempInput.slice(k.length);
+                matched = true;
+                break;
+            }
+        }
+        if(!matched && tempInput.length > 0){
+            let char = tempInput[0];
+            let isSpecial = false;
+            if (tempInput.length >= 2) {
+                const twoChar = tempInput.substring(0, 2);
+                if (specialKanaMap[twoChar] === '拗音') {
+                    finalUnits.push(twoChar);
+                    tempInput = tempInput.slice(2);
+                    isSpecial = true;
+                }
+            }
+            if (!isSpecial) {
+                if (specialKanaMap[char] || ['あ','い','う','え','お', 'か', 'き', 'く', 'け', 'こ', 'ん', 'ー', 'っ',
+                    'さ','し','す','せ','そ','た','ち','つ','て','と','な','に','ぬ','ね','の','は','ひ','ふ','へ','ほ','ま','み','む','め','も','や','ゆ','よ','ら','り','る','れ','ろ','わ','を'
+                    ].includes(char)) {
+                    finalUnits.push(char);
+                    tempInput = tempInput.slice(1);
+                    isSpecial = true;
+                }
+            }
+            if(!isSpecial) {
+                tempInput = tempInput.slice(1); 
+            }
+        }
+        if(!matched && tempInput.length > 0) { 
+            tempInput = tempInput.slice(1);
+        }
+    }
+    return finalUnits.filter(u => u !== ''); 
+}
+// ------------------------
+// 2. 聲學參數設定 (無變動)
+// ------------------------
+const VOWEL_FORMANTS = { 
+    'あ': [{f: 750, q: 5, g: 1}, {f: 1250, q: 10, g: 0.8}, {f: 2800, q: 15, g: 0.3}], 
+    'い': [{f: 250, q: 5, g: 1}, {f: 2400, q: 15, g: 0.8}, {f: 3000, q: 20, g: 0.3}], 
+    'う': [{f: 250, q: 5, g: 1}, {f: 850, q: 10, g: 0.8}, {f: 2500, q: 15, g: 0.3}], 
+    'え': [{f: 550, q: 7, g: 1}, {f: 1850, q: 12, g: 0.8}, {f: 2850, q: 18, g: 0.3}], 
+    'お': [{f: 550, q: 7, g: 1}, {f: 1050, q: 10, g: 0.8}, {f: 2750, q: 15, g: 0.3}], 
+    'a': [{f: 750, q: 5, g: 1}, {f: 1250, q: 10, g: 0.8}, {f: 2800, q: 15, g: 0.3}],
+    'i': [{f: 250, q: 5, g: 1}, {f: 2400, q: 15, g: 0.8}, {f: 3000, q: 20, g: 0.3}],
+    'u': [{f: 250, q: 5, g: 1}, {f: 850, q: 10, g: 0.8}, {f: 2500, q: 15, g: 0.3}],
+    'e': [{f: 550, q: 7, g: 1}, {f: 1850, q: 12, g: 0.8}, {f: 2850, q: 18, g: 0.3}],
+    'o': [{f: 550, q: 7, g: 1}, {f: 1050, q: 10, g: 0.8}, {f: 2750, q: 15, g: 0.3}],
+    'ん': [{f: 300, q: 3, g: 1}, {f: 1200, q: 5, g: 0.5}], 
+    'っ': { type: 'silence' }, 
+    'ー': { type: 'extend' }, 
+}; 
+const CONSONANT_PARAMS = {
+    'vowel': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+    'k': { type: 'noise', noiseDur: 0.1, isPlosive: true, startFreq: 5500, Q: 2, filterType: 'highpass' }, 
+    's': { type: 'noise', noiseDur: 0.1, isPlosive: false, startFreq: 5000, Q: 5, filterType: 'bandpass' }, 
+    'sh': { type: 'noise', noiseDur: 0.1, isPlosive: false, startFreq: 3000, Q: 6, filterType: 'bandpass' }, 
+    't': { type: 'noise', noiseDur: 0.1, isPlosive: true, startFreq: 6800, Q: 3, filterType: 'highpass' }, 
+    'ts': { type: 'noise', noiseDur: 0.08, isPlosive: false, startFreq: 4800, Q: 5, filterType: 'bandpass' }, 
+    'ch': { type: 'noise', noiseDur: 0.1, isPlosive: false, startFreq: 4000, Q: 6, filterType: 'bandpass' }, 
+    'h': { type: 'noise', noiseDur: 0.08, isPlosive: false, startFreq: 2500, Q: 2, filterType: 'highpass' }, 
+    'f': { type: 'noise', noiseDur: 0.08, isPlosive: false, startFreq: 3000, Q: 4, filterType: 'bandpass' }, 
+    'p': { type: 'noise', noiseDur: 0.1, isPlosive: true, startFreq: 5000, Q: 2, filterType: 'highpass' }, 
+    'g': { type: 'vowel', noiseDur: 0.04, isPlosive: true }, 
+    'z': { type: 'noise', noiseDur: 0.1, isPlosive: false, startFreq: 4000, Q: 4, filterType: 'bandpass' }, 
+    'j': { type: 'noise', noiseDur: 0.1, isPlosive: false, startFreq: 3800, Q: 5, filterType: 'bandpass' }, 
+    'd': { type: 'vowel', noiseDur: 0.04, isPlosive: true }, 
+    'b': { type: 'vowel', noiseDur: 0.04, isPlosive: true }, 
+    'm': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+    'y': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+    'r': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+    'w': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+    'n': { type: 'vowel', noiseDur: 0.0, isPlosive: false }, 
+};
+const KANA_TO_ROMAJI = { 'あ': 'a', 'い': 'i', 'う': 'u', 'え': 'e', 'お': 'o', 
+    'か': 'ka', 'き': 'ki', 'く': 'ku', 'け': 'ke', 'こ': 'ko', 'さ': 'sa', 'し': 'shi', 'す': 'su', 'せ': 'se', 'そ': 'so',
+    'た': 'ta', 'ち': 'chi', 'つ': 'tsu', 'て': 'te', 'と': 'to', 'な': 'na', 'に': 'ni', 'ぬ': 'nu', 'ね': 'ne', 'の': 'no',
+    'は': 'ha', 'ひ': 'hi', 'ふ': 'fu', 'へ': 'he', 'ほ': 'ho', 'ま': 'ma', 'み': 'mi', 'む': 'mu', 'め': 'me', 'も': 'mo',
+    'や': 'ya', 'ゆ': 'yu', 'よ': 'yo', 'ら': 'ra', 'り': 'ri', 'る': 'ru', 'れ': 're', 'ろ': 'ro',
+    'わ': 'wa', 'を': 'wo', 'ん': 'n', 'っ': 'xtsu', 'ー': '-'
+};
+function splitKanaCV(unit) {
+    const VOWEL_FROM_KANA = {
+        'あ':'a','か':'a','が':'a','さ':'a','ざ':'a','た':'a','だ':'a','な':'a','は':'a','ば':'a','ぱ':'a','ま':'a','や':'a','ら':'a','わ':'a',
+        'い':'i','き':'i','ぎ':'i','し':'i','じ':'i','ち':'i','ぢ':'i','に':'i','ひ':'i','び':'i','ぴ':'i','み':'i','り':'i',
+        'う':'u','く':'u','ぐ':'u','す':'u','ず':'u','つ':'u','づ':'u','ぬ':'u','ふ':'u','ぶ':'u','ぷ':'u','む':'u','ゆ':'u','る':'u',
+        'え':'e','け':'e','げ':'e','せ':'e','ぜ':'e','て':'e','で':'e','ね':'e','へ':'e','べ':'e','ぺ':'e','め':'e','れ':'e',
+        'お':'o','こ':'o','ご':'o','そ':'o','ぞ':'o','と':'o','ど':'o','の':'o','ほ':'o','ぼ':'o','ぽ':'o','も':'o','よ':'o','ろ':'o','を':'o',
+        'きゃ':'a','きゅ':'u','きょ':'o','しゃ':'a','しゅ':'u','しょ':'o','ちゃ':'a','ちゅ':'u','ちょ':'o','にゃ':'a','にゅ':'u','にょ':'o',
+        'ひゃ':'a','ひゅ':'u','ひょ':'o','みゃ':'a','みゅ':'u','みょ':'o','りゃ':'a','りゅ':'u','りょ':'o',
+        'ぎゃ':'a','ぎゅ':'u','ぎょ':'o','じゃ':'a','じゅ':'u','じょ':'o','びゃ':'a','びゅ':'u','びょ':'o','ぴゃ':'a','ぴゅ':'u','ぴょ':'o'
+    };
+    if (unit === 'ん') return { c: 'n', v: 'ん' };
+    if (unit === 'っ') return { c: 'vowel', v: 'っ' };
+    if (unit === 'ー') return { c: 'vowel', v: 'ー' };
+    let vowel = VOWEL_FROM_KANA[unit];
+    if (!vowel) vowel = 'a'; 
+    const romaji = KANA_TO_ROMAJI[unit] || '';
+    const consonant = romaji.replace(/[aiueo].*$/, '') || 'vowel';
+    const consonantKey = CONSONANT_PARAMS[consonant] ? consonant : 'vowel';
+    return { c: consonantKey, v: vowel };
+}
+// ------------------------
+// 3. Piano Roll 繪製/互動 (無變動)
+// ------------------------
+function freqToY(freq) {
+    const y = ((maxFreq - freq) / freqRange) * canvas.height;
+    return Math.max(0, Math.min(canvas.height, y));
+}
+function yToFreq(y) {
+    return maxFreq - (y / canvas.height) * freqRange;
+}
+function getFreqAtOffset(n, timeOffset, timeInNote) { 
+    if (!n.pitchPoints || n.pitchPoints.length === 0) {
+        return n.freq; 
+    }
+    
+    // Ensure timeOffset is between 0 and 1
+    timeOffset = Math.max(0, Math.min(1, timeOffset));
+
+    // Sort pitch points by timeOffset (important for interpolation)
+    n.pitchPoints.sort((a, b) => a.timeOffset - b.timeOffset);
+    
+    if (timeOffset <= n.pitchPoints[0].timeOffset) {
+        return n.pitchPoints[0].freq;
+    }
+    if (timeOffset >= n.pitchPoints[n.pitchPoints.length - 1].timeOffset) {
+        return n.pitchPoints[n.pitchPoints.length - 1].freq;
+    }
+    
+    let p1, p2;
+    for (let i = 0; i < n.pitchPoints.length - 1; i++) {
+        if (timeOffset >= n.pitchPoints[i].timeOffset && timeOffset <= n.pitchPoints[i+1].timeOffset) {
+            p1 = n.pitchPoints[i];
+            p2 = n.pitchPoints[i+1];
+            break;
+        }
+    }
+    
+    if (!p1 || !p2) {
+        return n.pitchPoints[n.pitchPoints.length - 1].freq; 
+    }
+    const tNorm = (timeOffset - p1.timeOffset) / (p2.timeOffset - p1.timeOffset);
+    const baseFreqInterp = p1.freq * (1 - tNorm) + p2.freq * tNorm;
+    return Math.max(minFreq, Math.min(maxFreq, baseFreqInterp));
+}
+function drawPitchCurve(n, offsetX) {
+    if (!n.pitchPoints || n.pitchPoints.length < 2) return;
+    
+    const startX_roll = offsetX + n.startTime * rollWidthPerSecond;
+    const durationInSec = n.dur;
+    
+    // Draw the curve
+    ctx.beginPath();
+    ctx.strokeStyle = '#1d4ed8'; 
+    ctx.lineWidth = 2;
+    
+    // We sample the curve to draw a smooth line, using more points than the control points
+    const totalSteps = 100; // Fixed steps for drawing smoothness
+    for(let i = 0; i <= totalSteps; i++) {
+        const timeOffset = i / totalSteps;
+        const freq = getFreqAtOffset(n, timeOffset, timeOffset * durationInSec); 
+        const x = startX_roll + timeOffset * durationInSec * rollWidthPerSecond;
+        const y = freqToY(freq);
+        
+        if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+    }
+    ctx.stroke();
+    
+    // Draw the control points
+    n.pitchPoints.forEach((p, index) => {
+        const x = startX_roll + p.timeOffset * durationInSec * rollWidthPerSecond;
+        const y = freqToY(p.freq);
+        ctx.fillStyle = index === 0 || index === n.pitchPoints.length - 1 ? '#059669' : '#f59e0b'; // Start/End points are green, middle are orange
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+    });
+}
+function drawNote(n, offsetX) {
+    const startX = offsetX + n.startTime * rollWidthPerSecond;
+    const width = n.dur * rollWidthPerSecond;
+    const topY = 0;
+    const height = canvas.height;
+    
+    ctx.fillStyle = n === selectedNote ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.1)';
+    ctx.fillRect(startX, topY, width, height);
+    ctx.strokeStyle = n === selectedNote ? '#2563eb' : '#60a5fa';
+    ctx.strokeRect(startX, topY, width, height);
+    
+    // Base frequency line (Note: pitch curve is drawn using pitchPoints, not n.freq)
+    const baseY = freqToY(n.freq);
+    ctx.beginPath();
+    ctx.strokeStyle = '#f87171';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 2]);
+    ctx.moveTo(startX, baseY);
+    ctx.lineTo(startX + width, baseY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#000';
+    ctx.font = '16px sans-serif';
+    const displayKana = romajiToKana[n.kana] || n.kana; 
+    ctx.fillText(displayKana, startX + 5, canvas.height - 10);
+    
+    drawPitchCurve(n, offsetX);
+}
+function drawRoll() {
+    // 重新計算總時長，以便決定畫布寬度
+    totalDuration = notes.length > 0 
+        ? notes[notes.length - 1].startTime + notes[notes.length - 1].dur + 1 
+        : 5;
+        
+    currentRollWidth = Math.max(rollContainer.clientWidth, totalDuration * rollWidthPerSecond);
+    canvas.width = currentRollWidth;
+    canvas.height = rollContainer.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#ddd';
+    // 繪製頻率格線
+    for (let f = 100; f <= 800; f += 100) {
+        const y = freqToY(f);
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+        ctx.fillStyle = '#aaa';
+        ctx.fillText(f + 'Hz', 5, y - 2);
+    }
+    
+    ctx.strokeStyle = '#ccc';
+    // 繪製時間格線
+    for (let t = 0; t < totalDuration; t++) {
+        const x = t * rollWidthPerSecond;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+        ctx.fillStyle = '#555';
+        ctx.fillText(t + 's', x + 5, 15);
+    }
+    
+    // 繪製音符
+    notes.forEach(n => drawNote(n, 0));
+    
+    // 更新滑動條
+    const maxScroll = rollContainer.scrollWidth - rollContainer.clientWidth;
+    pianoRollScrollbar.max = maxScroll > 0 ? maxScroll : 0;
+}
+function drawRollAndPreserveScroll() {
+    const scrollPos = rollContainer.scrollLeft;
+    drawRoll();
+    rollContainer.scrollLeft = scrollPos;
+    pianoRollScrollbar.value = scrollPos;
+}
+// ------------------------
+// 4. 音訊合成核心 (無變動)
+// ------------------------
+function createNoiseSource(context) {
+    const bufferSize = context.sampleRate * 0.5;
+    const buffer = context.createBuffer(1, bufferSize, context.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    return source;
+}
+function scheduleNoteSynthesis(context, n) {
+    const { c: consonant, v: vowelIndex } = splitKanaCV(n.kana);
+    const vParams = VOWEL_FORMANTS[vowelIndex];
+    if (!vParams || vParams.type === 'silence' || vParams.type === 'extend') {
+        return null;
+    }
+    
+    const cParams = CONSONANT_PARAMS[consonant] || CONSONANT_PARAMS['vowel'];
+    
+    const scheduledStartTime = context.currentTime + n.startTime;
+    const duration = n.dur;
+    const C_TIME = Math.min(duration, cParams.noiseDur);
+    const V_START = scheduledStartTime + C_TIME;
+    const V_DURATION = duration - C_TIME;
+    const stopTime = scheduledStartTime + duration;
+    
+    const masterGain = context.createGain();
+    masterGain.gain.setValueAtTime(0.0, scheduledStartTime);
+    masterGain.gain.linearRampToValueAtTime(0.9, scheduledStartTime + 0.01); 
+    masterGain.gain.linearRampToValueAtTime(0.0, stopTime);
+    if (C_TIME > 0) {
+        if (cParams.type === 'noise') {
+            const noiseSource = createNoiseSource(context);
+            const noiseGain = context.createGain();
+            const noiseFilter = context.createBiquadFilter();
+            noiseFilter.type = cParams.filterType || 'bandpass';
+            noiseFilter.frequency.setValueAtTime(cParams.startFreq || 4000, scheduledStartTime);
+            noiseFilter.Q.setValueAtTime(cParams.Q || 5, scheduledStartTime);
+            noiseGain.gain.setValueAtTime(0, scheduledStartTime);
+            noiseGain.gain.linearRampToValueAtTime(0.3, scheduledStartTime + C_TIME * 0.5);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, scheduledStartTime + C_TIME);
+            noiseSource.connect(noiseFilter).connect(noiseGain).connect(masterGain);
+            noiseSource.start(scheduledStartTime);
+            noiseSource.stop(scheduledStartTime + C_TIME);
+        } else if (cParams.isPlosive) {
+            const F0_osc = context.createOscillator();
+            F0_osc.type = 'square';
+            const F0_gain = context.createGain();
+            F0_osc.frequency.setValueAtTime(n.freq * 0.5, scheduledStartTime);
+            F0_gain.gain.setValueAtTime(0, scheduledStartTime);
+            F0_gain.gain.linearRampToValueAtTime(0.2, scheduledStartTime + C_TIME * 0.5);
+            F0_gain.gain.exponentialRampToValueAtTime(0.001, scheduledStartTime + C_TIME);
+            F0_osc.connect(F0_gain).connect(masterGain);
+            F0_osc.start(scheduledStartTime);
+            F0_osc.stop(scheduledStartTime + C_TIME);
+        }
+    }
+    if (V_DURATION > 0) {
+        const targetFormants = vParams; 
+        const VOWEL_STABLE_GAIN = 0.7;
+        const VOWEL_ATTACK_TIME = 0.05;
+        const VOWEL_RELEASE_TIME = 0.1;
+        
+        const F0_osc = context.createOscillator();
+        F0_osc.type = 'sine';
+        const HARM_osc = context.createOscillator();
+        HARM_osc.type = 'sawtooth'; 
+        
+        const F0_gain = context.createGain();
+        const HARM_gain = context.createGain();
+        
+        F0_gain.gain.setValueAtTime(0, scheduledStartTime);
+        F0_gain.gain.linearRampToValueAtTime(VOWEL_STABLE_GAIN * 0.8, V_START + VOWEL_ATTACK_TIME);
+        F0_gain.gain.linearRampToValueAtTime(VOWEL_STABLE_GAIN * 0.8, stopTime - VOWEL_RELEASE_TIME);
+        F0_gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
+        HARM_gain.gain.setValueAtTime(0, scheduledStartTime);
+        HARM_gain.gain.linearRampToValueAtTime(VOWEL_STABLE_GAIN * 0.5, V_START + VOWEL_ATTACK_TIME);
+        HARM_gain.gain.linearRampToValueAtTime(VOWEL_STABLE_GAIN * 0.5, stopTime - VOWEL_RELEASE_TIME);
+        HARM_gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
+        const Freq_param_F0 = F0_osc.frequency;
+        const Freq_param_HARM = HARM_osc.frequency;
+        const timeStep = MIN_TIME_STEP_MS / 1000; 
+        let currentTimeInNote = C_TIME; 
+        
+        // 從子音結束或音符開始處設定初始頻率
+        const initialFreq = getFreqAtOffset(n, C_TIME/n.dur, C_TIME);
+        Freq_param_F0.setValueAtTime(initialFreq, V_START); 
+        Freq_param_HARM.setValueAtTime(initialFreq, V_START); 
+        
+        // 沿著音高點曲線調整頻率
+        while (currentTimeInNote <= duration) {
+            const timeOffset = currentTimeInNote / duration;
+            const absoluteTime = scheduledStartTime + currentTimeInNote;
+            const freqValue = getFreqAtOffset(n, timeOffset, currentTimeInNote);
+            
+            Freq_param_F0.linearRampToValueAtTime(freqValue, absoluteTime);
+            Freq_param_HARM.linearRampToValueAtTime(freqValue, absoluteTime);
+            
+            currentTimeInNote += timeStep;
+        }
+        
+        // 顫音
+        if (n.vibratoEnabled && n.vibratoRate > 0 && n.vibratoDepth > 0) {
+            const vibrato = context.createOscillator();
+            const vibGain = context.createGain();
+            vibrato.frequency.value = n.vibratoRate;
+            vibGain.gain.value = n.vibratoDepth;
+            vibrato.connect(vibGain);
+            vibGain.connect(Freq_param_F0);
+            vibGain.connect(Freq_param_HARM);
+            vibrato.start(V_START);
+            vibrato.stop(stopTime);
+        }
+        
+        const filteredHarmonicsOutput = context.createGain();
+        filteredHarmonicsOutput.gain.setValueAtTime(1.0, 0); 
+        
+        // 共振峰濾波器
+        targetFormants.forEach((f) => {
+            const filter = context.createBiquadFilter();
+            filter.type = 'bandpass'; 
+            filter.frequency.setValueAtTime(f.f, V_START); 
+            filter.Q.setValueAtTime(f.q, V_START);
+            
+            const filterGain = context.createGain();
+            filterGain.gain.setValueAtTime(f.g * 1.5, V_START);
+            
+            filter.connect(filterGain).connect(filteredHarmonicsOutput);
+            HARM_osc.connect(filter);
+        });
+        
+        F0_osc.connect(F0_gain).connect(masterGain);
+        filteredHarmonicsOutput.connect(HARM_gain).connect(masterGain); 
+        F0_osc.start(V_START);
+        HARM_osc.start(V_START);
+        F0_osc.stop(stopTime);
+        HARM_osc.stop(stopTime);
+    } 
+    return masterGain;
+}
+// ------------------------
+// 5. 渲染與播放控制 (無變動)
+// ------------------------
+function updateControlsState(rendering) {
+    isRendering = rendering;
+    const isDisabled = rendering || notes.length === 0;
+    playBtn.disabled = isDisabled || !renderedAudioBuffer;
+    downloadBtn.disabled = isDisabled || !renderedAudioBuffer;
+    addBtn.disabled = rendering;
+    clearBtn.disabled = rendering;
+    importMidiBtn.disabled = rendering;
+    midiFileInput.disabled = rendering;
+    midiLyricsInput.disabled = rendering; 
+    
+    renderBtn.disabled = rendering || notes.length === 0;
+    autoPitchBtn.disabled = rendering || notes.length === 0;
+    autoPitchNaturalBtn.disabled = rendering || notes.length === 0;
+    autoPitchRobotBtn.disabled = rendering || notes.length === 0;
+    autoPitchStaccatoBtn.disabled = rendering || notes.length === 0;
+    autoPitchHarmonyBtn.disabled = rendering || notes.length === 0;
+    saveBtn.disabled = isDisabled;
+    loadBtn.disabled = rendering;
+    if (rendering) {
+        statusDiv.textContent = '正在進行離線合成... (請稍候)';
+    } else if (notes.length === 0) {
+        statusDiv.textContent = '準備就緒。請加入音符。';
+    } else if (renderedAudioBuffer) {
+        statusDiv.textContent = `合成緩衝區已準備就緒 (${renderedAudioBuffer.duration.toFixed(2)}s)。可播放。`;
+    } else {
+        statusDiv.textContent = '音符已變更，請點擊「渲染音訊」。';
+    }
+}
+async function renderAllNotes() {
+    if (notes.length === 0) {
+        renderedAudioBuffer = null;
+        updateControlsState(false);
+        return;
+    }
+    if (isRendering) return;
+    updateControlsState(true);
+    renderedAudioBuffer = null; 
+    const totalDuration = notes.length > 0 ? notes[notes.length - 1].startTime + notes[notes.length - 1].dur + 0.5 : 0;
+    const sampleRate = 44100;
+    const length = Math.ceil(totalDuration * sampleRate);
+    const numberOfChannels = 2;
+    if (length <= 0) {
+        updateControlsState(false);
+        return;
+    }
+    try {
+        const offlineCtx = new OfflineAudioContext(numberOfChannels, length, sampleRate);
+        const masterGain = offlineCtx.createGain();
+        masterGain.connect(offlineCtx.destination);
+        masterGain.gain.setValueAtTime(1.0, offlineCtx.currentTime);
+        notes.forEach(note => {
+            const noteSource = scheduleNoteSynthesis(offlineCtx, note);
+            if (noteSource) {
+                noteSource.connect(masterGain);
+            }
+        });
+        
+        renderedAudioBuffer = await offlineCtx.startRendering();
+        updateControlsState(false);
+        statusDiv.textContent = '渲染完成（已更新緩存）';
+        
+    } catch (error) {
+        console.error("渲染失敗:", error);
+        statusDiv.textContent = `渲染失敗: ${error.message}`;
+        updateControlsState(false);
+    }
+}
+function startPlayback() {
+    if (!renderedAudioBuffer) {
+        statusDiv.textContent = '音訊尚未渲染，請先點擊「渲染音訊」。';
+        return;
+    }
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    
+    if (currentSource) {
+        try {
+            currentSource.stop(0);
+        } catch (e) { /* ignore stop errors */ }
+        currentSource = null;
+    }
+    currentSource = audioCtx.createBufferSource();
+    currentSource.buffer = renderedAudioBuffer;
+    currentSource.connect(audioCtx.destination);
+    
+    currentSource.onended = () => {
+        statusDiv.textContent = '播放完成';
+        currentSource = null;
+    };
+    currentSource.start(audioCtx.currentTime);
+    statusDiv.textContent = `正在播放預渲染的音訊 (${renderedAudioBuffer.duration.toFixed(2)}s)...`;
+}
+function downloadWAV() {
+    if (!renderedAudioBuffer) {
+        statusDiv.textContent = '錯誤：請先渲染音訊！';
+        return;
+    }
+    
+    const buffer = renderedAudioBuffer;
+    const sampleRate = buffer.sampleRate;
+    const numberOfChannels = buffer.numberOfChannels;
+    const length = buffer.length;
+    const arrayBuffer = new ArrayBuffer(44 + length * numberOfChannels * 2);
+    const view = new DataView(arrayBuffer);
+    const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+    writeString(0, 'RIFF'); view.setUint32(4, 36 + length * numberOfChannels * 2, true);
+    writeString(8, 'WAVE'); writeString(12, 'fmt '); view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+    view.setUint16(32, numberOfChannels * 2, true); view.setUint16(34, 16, true);
+    writeString(36, 'data'); view.setUint32(40, length * numberOfChannels * 2, true);
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+            const data = buffer.getChannelData(channel);
+            const sample = Math.max(-1, Math.min(1, data[i]));
+            view.setInt16(offset, sample * 0x7FFF, true);
+            offset += 2;
+        }
+    }
+    const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'hiragana_synthesizer.wav';
+    a.click();
+    URL.revokeObjectURL(url);
+    statusDiv.textContent = 'WAV 文件下載完成';
+}
+// ------------------------
+// 6. MIDI 解析邏輯 (無變動)
+// ------------------------
+function readVarInt(view, offsetRef) {
+    let value = 0;
+    let byte = 0;
+    let offset = offsetRef.offset;
+    do {
+        if (offset >= view.byteLength) throw new Error("讀取 VLQ 時超出檔案邊界");
+        byte = view.getUint8(offset++);
+        value = (value << 7) + (byte & 0x7F);
+    } while (byte & 0x80);
+    offsetRef.offset = offset;
+    return value;
+}
+function parseMidiFile(arrayBuffer, lyricUnits) {
+    const view = new DataView(arrayBuffer);
+    let offset = 0;
+    const notesData = [];
+    let ticksPerBeat = 480; 
+    let microsecondsPerBeat = 500000;
+    let tickTime = 0;
+    if (view.getUint32(offset) !== 0x4D546864) throw new Error("不是有效的 MIDI 檔案 (缺少 MThd)");
+    offset += 8;
+    const format = view.getUint16(offset);
+    offset += 2;
+    const numTracks = view.getUint16(offset);
+    offset += 2;
+    const division = view.getUint16(offset);
+    offset += 2;
+    if (division & 0x8000) {
+        throw new Error("MIDI 格式錯誤: 僅支持基於節拍的計時 (PPQ)");
+    } else {
+        ticksPerBeat = division; 
+    }
+    
+    tickTime = microsecondsPerBeat / 1000000 / ticksPerBeat;
+    const activeNotes = {};
+    let absoluteTimeInTicks = 0;
+    let currentLyricIndex = 0;
+    
+    for (let track = 0; track < numTracks; track++) { 
+        if (currentLyricIndex >= lyricUnits.length) break; 
+        while (offset < view.byteLength && view.getUint32(offset) !== 0x4D54726B) offset++;
+        if (offset >= view.byteLength) break;
+        offset += 4;
+        
+        const trackLength = view.getUint32(offset);
+        offset += 4;
+        const trackStart = offset;
+        let runningStatus = 0;
+        absoluteTimeInTicks = 0;
+        while (offset < trackStart + trackLength) {
+            const offsetRef = { offset: offset };
+            const deltaTicks = readVarInt(view, offsetRef);
+            offset = offsetRef.offset;
+            absoluteTimeInTicks += deltaTicks;
+            let absoluteTimeInSeconds = absoluteTimeInTicks * tickTime;
+            let eventType = view.getUint8(offset);
+            if (eventType < 0x80) {
+                eventType = runningStatus;
+            } else {
+                runningStatus = eventType;
+                offset++;
+            }
+            const command = eventType & 0xF0;
+            if (command === 0x90 || command === 0x80) {
+                const pitch = view.getUint8(offset++);
+                const velocity = view.getUint8(offset++);
+                if (command === 0x90 && velocity > 0) {
+                    activeNotes[pitch] = { startTimeInSeconds: absoluteTimeInSeconds };
+                } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+                    const noteStartTime = activeNotes[pitch];
+                    if (noteStartTime) {
+                        const duration = absoluteTimeInSeconds - noteStartTime.startTimeInSeconds;
+                        const freq = 440 * Math.pow(2, (pitch - 69) / 12);
+                        
+                        if (currentLyricIndex < lyricUnits.length && duration > 0.01) {
+                            notesData.push({
+                                kana: lyricUnits[currentLyricIndex],
+                                freq: freq,
+                                startTime: noteStartTime.startTimeInSeconds,
+                                dur: duration,
+                                pitchPoints: [{timeOffset: 0.0, freq: freq}, {timeOffset: 1.0, freq: freq}], // 預設直線
+                                vibratoEnabled: true,
+                                vibratoRate: 5,
+                                vibratoDepth: 10
+                            });
+                            currentLyricIndex++;
+                        }
+                        delete activeNotes[pitch];
+                    }
+                }
+            } else if (command === 0xC0 || command === 0xD0) {
+                offset += 1;
+            } else if (command === 0xA0 || command === 0xB0 || command === 0xE0) {
+                offset += 2;
+            } else if (eventType === 0xFF) {
+                const metaType = view.getUint8(offset++);
+                const offsetRefMeta = { offset: offset };
+                const length = readVarInt(view, offsetRefMeta);
+                offset = offsetRefMeta.offset;
+                
+                if (metaType === 0x51 && length === 3) {
+                    microsecondsPerBeat = (view.getUint8(offset) << 16) | (view.getUint8(offset + 1) << 8) | view.getUint8(offset + 2);
+                    tickTime = microsecondsPerBeat / 1000000 / ticksPerBeat;
+                }
+                offset += length;
+            } else if (eventType === 0xF0 || eventType === 0xF7) {
+                const offsetRefSysex = { offset: offset };
+                const length = readVarInt(view, offsetRefSysex);
+                offset = offsetRefSysex.offset + length;
+            }
+        }
+        
+        // 只有格式 0 只能處理一軌，格式 1 必須處理所有軌道
+        if (format === 0 || currentLyricIndex >= lyricUnits.length) break;
+    }
+    
+    notesData.sort((a, b) => a.startTime - b.startTime);
+    return notesData;
+}
+// ------------------------
+// 7. 專案儲存與載入邏輯 (無變動)
+// ------------------------
+function getProjectData() {
+    return {
+        metadata: {
+            version: "v3.0.4-freehand-pitch",
+            timestamp: new Date().toISOString(),
+            notesCount: notes.length
+        },
+        settings: {
+            baseFreq: parseFloat(baseFreqInput.value),
+            dur: parseFloat(durInput.value),
+            gap: parseFloat(gapInput.value),
+            vibratoRate: parseFloat(vibratoRateInput.value),
+            vibratoDepth: parseFloat(vibratoDepthInput.value)
+        },
+        notes: notes.map(n => ({
+            kana: n.kana,
+            freq: n.freq,
+            startTime: n.startTime,
+            dur: n.dur,
+            pitchPoints: n.pitchPoints,
+            vibratoEnabled: n.vibratoEnabled,
+            vibratoRate: n.vibratoRate,
+            vibratoDepth: n.vibratoDepth
+        }))
+    };
+}
+function saveNotes() {
+    if (notes.length === 0) {
+        statusDiv.textContent = '錯誤：沒有音符可儲存！';
+        return;
+    }
+    
+    const projectData = getProjectData();
+    const json = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hiragana_project_${new Date().toISOString().substring(0, 10).replace(/-/g, '')}.sine`;
+    a.click();
+    URL.revokeObjectURL(url);
+    statusDiv.textContent = '專案已儲存為 .sine 檔案';
+}
+function loadNotes(event) {
+    const file = event.target.files[0];
+    if (!file || !file.name.toLowerCase().endsWith('.sine')) {
+        statusDiv.textContent = '錯誤：請載入副檔名為 .sine 的檔案！';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.notes || !Array.isArray(data.notes)) {
+                throw new Error("檔案格式錯誤或缺少音符數據。");
+            }
+            
+            notes = data.notes.map(n => ({
+                kana: n.kana,
+                freq: n.freq || 500,
+                startTime: n.startTime || 0,
+                dur: n.dur || 0.5,
+                pitchPoints: Array.isArray(n.pitchPoints) ? n.pitchPoints : [{timeOffset: 0.0, freq: n.freq || 500}, {timeOffset: 1.0, freq: n.freq || 500}],
+                vibratoEnabled: n.vibratoEnabled || false,
+                vibratoRate: n.vibratoRate || 5,
+                vibratoDepth: n.vibratoDepth || 10,
+            }));
+            
+            if (data.settings) {
+                baseFreqInput.value = data.settings.baseFreq || 500;
+                durInput.value = data.settings.dur || 0.5;
+                gapInput.value = data.settings.gap || 0.1;
+                vibratoRateInput.value = data.settings.vibratoRate || 5;
+                vibratoDepthInput.value = data.settings.vibratoDepth || 10;
+            }
+            
+            drawRollAndPreserveScroll();
+            updateControlsState(false);
+            statusDiv.textContent = `成功載入 ${notes.length} 個音符，請點擊渲染。`;
+            clearSelection();
+        } catch (error) {
+            console.error("載入失敗:", error);
+            statusDiv.textContent = `載入 .sine 檔案失敗: ${error.message}`;
+        }
+        
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+// ------------------------
+// 8. 事件處理函數 (接續完成)
+// ------------------------
+function handleAddNote() {
+    const text = textInput.value.trim();
+    if (!text) {
+        statusDiv.textContent = '錯誤：請輸入音節！';
+        return;
+    }
+    const baseFreq = parseFloat(baseFreqInput.value);
+    const dur = parseFloat(durInput.value);
+    const gap = parseFloat(gapInput.value);
+    const units = parseText(text);
+    // 設定起始時間：以上一個音符結束時間 + 間隔
+    let currentTime = notes.length > 0 
+        ? notes[notes.length - 1].startTime + notes[notes.length - 1].dur + gap 
+        : gap;
+
+    const vibratoRate = parseFloat(vibratoRateInput.value);
+    const vibratoDepth = parseFloat(vibratoDepthInput.value);
+
+    units.forEach((unit) => {
+        // 處理長音符號 'ー'：延長前一個音符時長
+        if (unit === 'ー' && notes.length > 0) {
+            notes[notes.length - 1].dur += dur;
+            return;
+        }
+        // 處理促音 'っ'：略過但不跳過時間
+        if (unit === 'っ') {
+            currentTime += dur + gap; 
+            return;
+        }
+
+        // 初始化音高點：預設為一條直線，由 autoPitch 處理滑音
+        const pitchPoints = [
+            { timeOffset: 0.0, freq: baseFreq },
+            { timeOffset: 1.0, freq: baseFreq }
+        ];
+
+        notes.push({
+            kana: unit,
+            freq: baseFreq,
+            startTime: currentTime,
+            dur: dur,
+            pitchPoints: pitchPoints,
+            vibratoEnabled: vibratoRate > 0 && vibratoDepth > 0,
+            vibratoRate: vibratoRate,
+            vibratoDepth: vibratoDepth
+        });
+        
+        // 前進到下一個音符的時間點
+        currentTime += dur + gap;
+    });
+
+    drawRollAndPreserveScroll();
+    renderedAudioBuffer = null; 
+    updateControlsState(false);
+    statusDiv.textContent = `已加入 ${units.length} 個音符。請點擊渲染。`;
+}
+
+// ------------------------
+// 9. 音符選擇與編輯
+// ------------------------
+function selectNote(n) {
+    selectedNote = n;
+    if (n) {
+        noteEditor.classList.remove('hidden');
+        noteVibratoRateInput.value = n.vibratoRate;
+        noteVibratoDepthInput.value = n.vibratoDepth;
+        vibratoToggleBtn.textContent = n.vibratoEnabled ? '顫音: 開' : '顫音: 關';
+        noteVibratoRateInput.disabled = !n.vibratoEnabled;
+        noteVibratoDepthInput.disabled = !n.vibratoEnabled;
+        vibratoToggleBtn.classList.toggle('bg-gray-400', !n.vibratoEnabled);
+        vibratoToggleBtn.classList.toggle('bg-green-500', n.vibratoEnabled);
+    } else {
+        noteEditor.classList.add('hidden');
+    }
+    drawRollAndPreserveScroll();
+}
+
+function clearSelection() {
+    selectNote(null);
+}
+
+function handleVibratoToggle() {
+    if (selectedNote) {
+        selectedNote.vibratoEnabled = !selectedNote.vibratoEnabled;
+        handleNoteChange();
+    }
+}
+
+function handleVibratoRateChange(e) {
+    if (selectedNote) {
+        selectedNote.vibratoRate = parseFloat(e.target.value);
+        handleNoteChange();
+    }
+}
+
+function handleVibratoDepthChange(e) {
+    if (selectedNote) {
+        selectedNote.vibratoDepth = parseFloat(e.target.value);
+        handleNoteChange();
+    }
+}
+
+function handleDeleteNote() {
+    if (selectedNote) {
+        const index = notes.findIndex(n => n === selectedNote);
+        if (index > -1) {
+            notes.splice(index, 1);
+            clearSelection();
+            drawRollAndPreserveScroll();
+            renderedAudioBuffer = null;
+            updateControlsState(false);
+            statusDiv.textContent = '音符已刪除。請點擊渲染。';
+        }
+    }
+}
+
+function handleNoteChange() {
+    // 重新繪製並標記需要重新渲染
+    drawRollAndPreserveScroll();
+    renderedAudioBuffer = null; 
+    updateControlsState(false);
+    selectNote(selectedNote); // 更新編輯器 UI
+}
+
+// ------------------------
+// 10. 互動點擊與拖曳
+// ------------------------
+
+function getMousePos(canvas, event) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY
+    };
+}
+
+function getNoteUnderMouse(x) {
+    const time = x / rollWidthPerSecond;
+    return notes.find(n => time >= n.startTime && time < n.startTime + n.dur);
+}
+
+function handleRollClick(event) {
+    const pos = getMousePos(canvas, event);
+    const note = getNoteUnderMouse(pos.x);
+    
+    // 檢查是否點擊了音高點
+    let pitchPointClicked = false;
+    if (note && note.pitchPoints && note.pitchPoints.length > 0) {
+        const startX_roll = note.startTime * rollWidthPerSecond;
+        const durationInPixels = note.dur * rollWidthPerSecond;
+        
+        for (let i = 0; i < note.pitchPoints.length; i++) {
+            const p = note.pitchPoints[i];
+            const px = startX_roll + p.timeOffset * durationInPixels;
+            const py = freqToY(p.freq);
+            
+            // 判斷是否在點擊範圍內 (8x8 像素)
+            if (Math.abs(pos.x - px) < 8 && Math.abs(pos.y - py) < 8) {
+                activePitchPoint = p;
+                dragMode = 'dragPitchPoint';
+                pitchPointClicked = true;
+                rollContainer.style.cursor = 'crosshair';
+                selectNote(note); // 即使只是拖點，也確保音符被選中
+                return;
+            }
+        }
+    }
+    
+    if (pitchPointClicked) return;
+
+    if (note) {
+        selectNote(note);
+    } else {
+        clearSelection();
+    }
+}
+
+function handleRollDragStart(event) {
+    if (event.target !== canvas) return;
+    event.preventDefault();
+
+    const isTouch = event.type.startsWith('touch');
+    const clientX = isTouch ? event.touches[0].clientX : event.clientX;
+    const pos = getMousePos(canvas, event);
+    
+    // 如果已經在拖動音高點模式，則不改變
+    if (dragMode === 'dragPitchPoint') return;
+    
+    // 檢查是否點擊了音高點 (在 click 事件中已經檢查，但為了防止拖動滾動條，這裡再次檢查)
+    const note = getNoteUnderMouse(pos.x);
+    if (note && note.pitchPoints.length > 0) {
+        const startX_roll = note.startTime * rollWidthPerSecond;
+        const durationInPixels = note.dur * rollWidthPerSecond;
+        
+        for (let i = 0; i < note.pitchPoints.length; i++) {
+            const p = note.pitchPoints[i];
+            const px = startX_roll + p.timeOffset * durationInPixels;
+            const py = freqToY(p.freq);
+            if (Math.abs(pos.x - px) < 8 && Math.abs(pos.y - py) < 8) {
+                activePitchPoint = p;
+                dragMode = 'dragPitchPoint';
+                rollContainer.style.cursor = 'crosshair';
+                selectNote(note);
+                return;
+            }
+        }
+    }
+
+    // 否則，開始拖動滾動條
+    isDraggingRoll = true;
+    startDragX = clientX;
+    startScrollLeft = rollContainer.scrollLeft;
+    rollContainer.style.cursor = 'grabbing';
+    dragMode = 'scroll';
+}
+
+function handleRollDrag(event) {
+    if (!dragMode) return;
+
+    const isTouch = event.type.startsWith('touch');
+    const clientX = isTouch ? event.touches[0].clientX : event.clientX;
+    const clientY = isTouch ? event.touches[0].clientY : event.clientY;
+
+    if (dragMode === 'scroll') {
+        const deltaX = clientX - startDragX;
+        rollContainer.scrollLeft = startScrollLeft - deltaX;
+        updatePianoRollScrollbar();
+    } else if (dragMode === 'dragPitchPoint' && activePitchPoint && selectedNote) {
+        event.preventDefault();
+        const pos = getMousePos(canvas, { clientX, clientY });
+        
+        // 計算新的頻率 (Y軸)
+        let newFreq = yToFreq(pos.y);
+        newFreq = Math.max(minFreq, Math.min(maxFreq, newFreq)); // 限制頻率範圍
+        
+        // 更新音高點
+        activePitchPoint.freq = newFreq;
+        
+        // 確保起始點 (timeOffset=0) 和結束點 (timeOffset=1) 不會改變 timeOffset
+        if (activePitchPoint.timeOffset > 0 && activePitchPoint.timeOffset < 1) {
+             // 計算新的時間偏移量 (X軸)
+            const noteStart_roll = selectedNote.startTime * rollWidthPerSecond;
+            const noteDuration_roll = selectedNote.dur * rollWidthPerSecond;
+            
+            let newTimeOffset = (pos.x - noteStart_roll) / noteDuration_roll;
+            newTimeOffset = Math.max(0, Math.min(1, newTimeOffset));
+            activePitchPoint.timeOffset = newTimeOffset;
+        }
+
+        handleNoteChange(); 
+    }
+}
+
+function handleRollDragEnd() {
+    isDraggingRoll = false;
+    dragMode = null;
+    activePitchPoint = null;
+    rollContainer.style.cursor = 'grab';
+    if (!renderedAudioBuffer) updateControlsState(false); // 如果有變動，提示渲染
+}
+
+function handlePitchPointClick(event) {
+    if (!selectedNote || dragMode === 'dragPitchPoint') return; 
+
+    const pos = getMousePos(canvas, event);
+    const time = pos.x / rollWidthPerSecond;
+    
+    if (time >= selectedNote.startTime && time <= selectedNote.startTime + selectedNote.dur) {
+        // 在選定的音符範圍內
+        const noteDuration = selectedNote.dur;
+        const noteStart = selectedNote.startTime;
+        const timeOffset = (time - noteStart) / noteDuration;
+        const newFreq = yToFreq(pos.y);
+        
+        // 避免在 0 和 1 處新增點
+        if (timeOffset < 0.05 || timeOffset > 0.95) return; 
+
+        // 新增音高點
+        selectedNote.pitchPoints.push({
+            timeOffset: timeOffset,
+            freq: newFreq
+        });
+        
+        // 排序音高點
+        selectedNote.pitchPoints.sort((a, b) => a.timeOffset - b.timeOffset);
+        
+        handleNoteChange();
+        statusDiv.textContent = '已新增音高控制點。';
+    }
+}
+
+// ------------------------
+// ============================================
+// 11. 自動智能音高風格
+// ============================================
+
+/**
+ * 自動智能音高風格
+ * 根據音符特性自動應用最佳音高變化
+ * 
+ * 規則:
+ * - 短促音符: 自動微抖,增添活力感
+ * - 音符中段: 保持平穩,避免突兀跳動
+ * - 長音: 開頭從低向高緩慢過渡,尾端略微下降
+ * - 輕微顫音: 頻率偏移在 5~20 cents 之間
+ * - 銜接處: 微幅凹下,形成自然過渡弧線
+ * - 連續音符: 平滑過渡,避免突兀跳音
+ * - 尾端: 音高小幅上揚,表現輕微張力
+ * - 休止符: 附近音高微幅波動,營造呼吸感
+ * - 重音: 加強音高變化,使表現更生動
+ * - 顫音速率: 固定 5.3 Hz
+ */
+function applyAutoPitchStyle() {
+    if (notes.length === 0) {
+        console.log('沒有音符');
+        statusDiv.textContent = '沒有音符可以套用自動音高';
+        return;
+    }
+
+    console.log('=== 開始套用自動智能音高 + 動態音量 ===');
+
+    const VIBRATO_RATE = 0;
+    const VIBRATO_DEPTH_BASE = 0;  // 增強顫音
+
+    for (let i = 0; i < notes.length; i++) {
+        const n = notes[i];
+        
+        if (!n.freq || !n.dur) {
+            console.warn(`音符${i}缺少基礎屬性`);
+            continue;
+        }
+        
+        const prevFreq = (i > 0 && notes[i-1].freq) ? notes[i-1].freq : n.freq;
+        const nextFreq = (i < notes.length - 1 && notes[i+1].freq) ? notes[i+1].freq : n.freq;
+        
+        const isShort = n.dur < 0.25;
+        const isLong = n.dur > 0.8;
+        const hasRestAfter = i < notes.length - 1 && 
+                            (notes[i+1].time - (n.time + n.dur)) > 0.05;
+        const isAccented = n.vel && n.vel > 0.8;
+
+        n.vibratoEnabled = true;
+        n.vibratoRate = VIBRATO_RATE;
+        
+        // ========================================
+        // 音高曲線 (pitchPoints)
+        // ========================================
+        
+        if (isShort) {
+            // 短促音符: 快速抖動
+            n.vibratoDepth = 0;
+            
+            n.pitchPoints = [
+                { timeOffset: 0.0, freq: prevFreq * 0.0 },   // 從很低開始
+                { timeOffset: 0.15, freq: n.freq  * 1.0},    // 快速衝高
+                { timeOffset: 0.5, freq: n.freq  * 1.0},           // 中段穩定
+                { timeOffset: 0.85, freq: n.freq * 1.0},    // 再次上揚
+                { timeOffset: 1.0, freq: n.freq * 1.0}      // 快速下降
+            ];
+            
+            // 音量曲線: 快速爆發
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.1 },              // 輕柔開始
+                { timeOffset: 0.1, gain: 1.0 },              // 快速爆發
+                { timeOffset: 0.4, gain: 0.8 },              // 中段維持
+                { timeOffset: 1.0, gain: 0.05 }              // 快速消失
+            ];
+            
+            console.log(`音符${i}: 短促 - 爆發式`);
+            
+        } else if (isLong) {
+            // 長音: 緩慢變化
+            n.vibratoDepth = 0;
+            
+            n.pitchPoints = [
+                { timeOffset: 0.0, freq: n.freq},    // 從低開始
+                { timeOffset: 0.2, freq: n.freq},    // 緩慢上升
+                { timeOffset: 0.4, freq: n.freq},    // 爬過目標
+                { timeOffset: 0.6, freq: n.freq},           // 回到正常
+                { timeOffset: 0.8, freq: n.freq * 1.2},    // 開始下降
+                { timeOffset: 1.0, freq: n.freq * 0.5}     // 明顯收尾
+            ];
+            
+            // 音量曲線: 漸強漸弱 (crescendo-decrescendo)
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.2 },              // 輕柔開始
+                { timeOffset: 0.15, gain: 0.5 },             // 逐漸增強
+                { timeOffset: 0.35, gain: 1.2 },             // 達到高峰
+                { timeOffset: 0.65, gain: 1.0 },             // 維持力度
+                { timeOffset: 0.85, gain: 0.6 },             // 開始減弱
+                { timeOffset: 1.0, gain: 0.1 }               // 輕柔結束
+            ];
+            
+            console.log(`音符${i}: 長音 - 漸強漸弱`);
+            
+        } else {
+            // 普通音符: 標準表現力
+            n.vibratoDepth = 5;
+            
+            n.pitchPoints = [
+                { timeOffset: 0.0, freq: prevFreq},   // 銜接凹陷
+                { timeOffset: 0.15, freq: n.freq},   // 接近目標
+                { timeOffset: 0.5, freq: n.freq },           // 中段穩定
+                { timeOffset: 0.8, freq: n.freq * 1.0},    // 尾端上揚
+                { timeOffset: 1.0, freq: n.freq * 2.0}      // 張力結尾
+            ];
+            
+            // 音量曲線: 自然起伏
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.3 },              // 柔和起音
+                { timeOffset: 0.2, gain: 0.9 },              // 快速到達
+                { timeOffset: 0.7, gain: 0.85 },             // 穩定維持
+                { timeOffset: 1.0, gain: 0.2 }               // 自然收尾
+            ];
+            
+            console.log(`音符${i}: 普通 - 自然表現`);
+        }
+
+        // ========================================
+        // 特殊情況處理
+        // ========================================
+        
+        // 休止符: 呼吸感 (音高下降 + 音量快速消失)
+        if (hasRestAfter) {
+            n.pitchPoints[n.pitchPoints.length - 1].freq *= 0.75; // 音高大幅下降
+            n.volumePoints[n.volumePoints.length - 1].gain = 0.01; // 幾乎靜音
+            console.log(`  └ 休止符前 - 呼吸感`);
+        }
+
+        // 重音: 極度強化 (音高變化大 + 音量爆發)
+        if (isAccented) {
+            n.vibratoDepth = 0; // 最強顫音
+            
+            // 音高: 更深的凹陷 + 更強的張力
+            n.pitchPoints[0].freq *= 0.8;  // 起始深度凹陷
+            n.pitchPoints[n.pitchPoints.length - 1].freq *= 1.15; // 尾端強烈張力
+            
+            // 音量: 爆發式強調
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.5 },              // 較強起音
+                { timeOffset: 0.05, gain: 2.0 },             // 瞬間爆發！
+                { timeOffset: 0.3, gain: 1.5 },              // 維持強度
+                { timeOffset: 0.7, gain: 1.2 },              // 持續有力
+                { timeOffset: 1.0, gain: 0.3 }               // 有力收尾
+            ];
+            
+            console.log(`  └ 重音 - 爆發強化`);
+        }
+        
+        // ========================================
+        // 確保至少有基礎點
+        // ========================================
+        if (!n.volumePoints || n.volumePoints.length < 2) {
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.5 },
+                { timeOffset: 1.0, gain: 0.5 }
+            ];
+        }
+    }
+    
+    console.log('=== 自動智能音高 + 動態音量套用完成 ===');
+    
+    drawRollAndPreserveScroll();
+    renderedAudioBuffer = null;
+    updateControlsState(false);
+    statusDiv.textContent = '已套用「自動智能(音高+音量)」風格。請點擊渲染。';
+}
+
+
+// ============================================
+// 手動音高風格選擇器
+// ============================================
+
+/**
+ * 應用指定的音高風格
+ * @param {string} style - 風格名稱: 'auto', 'default', 'natural', 'robot', 'staccato', 'harmony'
+ */
+function applyPitchStyle(style) {
+    if (notes.length === 0) {
+        statusDiv.textContent = '沒有音符可以套用風格';
+        return;
+    }
+
+    console.log('========================================');
+    console.log('applyPitchStyle 被調用,風格:', style);
+    console.log('========================================');
+
+    // ===== 自動智能風格 =====
+    if (style === 'auto') {
+        console.log('→ 觸發自動智能風格');
+        applyAutoPitchStyle();
+        return;
+    }
+
+    // ===== 手動風格 =====
+    console.log('→ 觸發手動風格:', style);
+    
+    for (let i = 0; i < notes.length; i++) {
+        const n = notes[i];
+        const prevFreq = i > 0 
+            ? (notes[i-1].pitchPoints && notes[i-1].pitchPoints.length > 0
+                ? notes[i-1].pitchPoints[notes[i-1].pitchPoints.length - 1].freq
+                : notes[i-1].freq)
+            : n.freq; 
+        const nextFreq = i < notes.length - 1 
+            ? notes[i+1].freq 
+            : n.freq;
+        
+        // 預設顫音設定
+        n.vibratoEnabled = true;
+        n.vibratoRate = 5;
+        n.vibratoDepth = 5;
+        
+        switch (style) {
+            case 'default':
+                // 標準平滑滑音
+                applyPitchGlide(n, prevFreq, nextFreq, 0.1, false);
+                break;
+                
+            case 'natural':
+                // 更柔和的人聲化滑音
+                applyPitchGlide(n, prevFreq, nextFreq, 0.25, false); 
+                n.vibratoRate = 4.5;
+                n.vibratoDepth = 12;
+                break;
+                
+            case 'robot':
+                // 硬切,無滑音
+                n.pitchPoints = [
+                    { timeOffset: 0.0, freq: n.freq },
+                    { timeOffset: 0.001, freq: n.freq },
+                    { timeOffset: 1.0, freq: n.freq }
+                ];
+                n.vibratoEnabled = false;
+                break;
+                
+            case 'staccato':
+                // 斷奏風格
+                n.pitchPoints = [
+                    { timeOffset: 0.0, freq: prevFreq },
+                    { timeOffset: 0.1, freq: n.freq },
+                    { timeOffset: 0.8, freq: n.freq },
+                    { timeOffset: 1.0, freq: 10 }
+                ];
+                n.vibratoEnabled = false;
+                break;
+                
+            case 'harmony':
+                // 和聲風格
+                applyPitchGlide(n, prevFreq, nextFreq, 0.3, false);
+                n.vibratoRate = 6;
+                n.vibratoDepth = 15;
+                break;
+                
+            default:
+                console.warn('未知風格:', style);
+                statusDiv.textContent = `未知風格: ${style}`;
+                return;
+        }
+    }
+    
+    drawRollAndPreserveScroll();
+    renderedAudioBuffer = null;
+    updateControlsState(false);
+    statusDiv.textContent = `已套用「${style}」音高風格。請點擊渲染。`;
+}
+
+
+// ============================================
+// 輔助函數: 音高滑動
+// ============================================
+
+/**
+ * 應用音高滑動效果
+ * @param {object} n - 音符對象
+ * @param {number} startFreq - 起始頻率
+ * @param {number} endFreq - 結束頻率
+ * @param {number} glideRatio - 滑動時間比例
+ * @param {boolean} vibratoOff - 是否關閉顫音
+ */
+function applyPitchGlide(n, startFreq, endFreq, glideRatio = 0.1, vibratoOff = false) {
+    const glideTime = Math.min(n.dur * glideRatio, 0.15);
+
+    n.pitchPoints = [
+        { timeOffset: 0.0, freq: startFreq },
+        { timeOffset: glideTime / n.dur, freq: n.freq },
+        { timeOffset: 1.0 - glideTime / n.dur, freq: n.freq },
+        { timeOffset: 1.0, freq: endFreq }
+    ];
+    
+    // 確保至少有 2 個點
+    if (n.pitchPoints.length < 2) {
+         n.pitchPoints = [
+             { timeOffset: 0.0, freq: n.freq }, 
+             { timeOffset: 1.0, freq: n.freq }
+         ];
+    }
+    
+    if (vibratoOff) {
+        n.vibratoEnabled = false;
+    }
+}
+
+function updatePianoRollScrollbar() {
+    pianoRollScrollbar.value = rollContainer.scrollLeft;
+}
+
+function setupListeners() {
+    addBtn.addEventListener('click', handleAddNote);
+    renderBtn.addEventListener('click', renderAllNotes);
+    playBtn.addEventListener('click', startPlayback);
+    downloadBtn.addEventListener('click', downloadWAV);
+    clearBtn.addEventListener('click', () => { notes = []; clearSelection(); drawRoll(); renderedAudioBuffer = null; updateControlsState(false); statusDiv.textContent = '所有音符已清空。'; });
+    
+    // 自動音高按鈕
+    document.querySelectorAll('[data-style]').forEach(btn => {
+        btn.addEventListener('click', (e) => applyPitchStyle(e.target.dataset.style));
+    });
+
+    // 儲存/載入
+    saveBtn.addEventListener('click', saveNotes);
+    loadBtn.addEventListener('click', () => loadFileInput.click());
+    loadFileInput.addEventListener('change', loadNotes);
+    
+    // 鋼琴捲簾拖曳和點擊事件
+    canvas.addEventListener('mousedown', handleRollDragStart);
+    canvas.addEventListener('mousemove', handleRollDrag);
+    canvas.addEventListener('mouseup', handleRollDragEnd);
+    canvas.addEventListener('mouseleave', handleRollDragEnd);
+    canvas.addEventListener('click', handleRollClick);
+    
+    // 點擊音符以外的地方新增音高點
+    canvas.addEventListener('dblclick', handlePitchPointClick); 
+
+    // 觸控事件
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleRollDragStart(e.touches[0]);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        handleRollDrag(e.touches[0]);
+    }, { passive: false });
+    canvas.addEventListener('touchend', handleRollDragEnd);
+    
+    // 滑動條同步
+    rollContainer.addEventListener('scroll', updatePianoRollScrollbar);
+    pianoRollScrollbar.addEventListener('input', () => {
+        rollContainer.scrollLeft = pianoRollScrollbar.value;
+    });
+
+    // 編輯器控制項
+    vibratoToggleBtn.addEventListener('click', handleVibratoToggle);
+    noteVibratoRateInput.addEventListener('input', handleVibratoRateChange);
+    noteVibratoDepthInput.addEventListener('input', handleVibratoDepthChange);
+    deleteNoteBtn.addEventListener('click', handleDeleteNote);
+}
+
+function setupMIDIImport() {
+    importMidiBtn.addEventListener('click', () => {
+        if (midiFileInput.files.length === 0) {
+            statusDiv.textContent = '錯誤：請選擇一個 MIDI 檔案。';
+            return;
+        }
+        const lyricText = midiLyricsInput.value.trim();
+        if (!lyricText) {
+            statusDiv.textContent = '錯誤：請輸入一行歌詞。';
+            return;
+        }
+        
+        const file = midiFileInput.files[0];
+        const reader = new FileReader();
+        const lyricUnits = parseText(lyricText);
+        
+        if (lyricUnits.length === 0) {
+             statusDiv.textContent = '錯誤：歌詞解析失敗，請確認羅馬拼音或平假名格式。';
+             return;
+        }
+
+        reader.onload = function(e) {
+            try {
+                const midiNotes = parseMidiFile(e.target.result, lyricUnits);
+                notes = midiNotes;
+                
+                // 導入後立即套用預設音高風格 (平滑滑音)
+                if (notes.length > 0) {
+                     applyPitchStyle('default');
+                }
+
+                drawRollAndPreserveScroll();
+                renderedAudioBuffer = null;
+                updateControlsState(false);
+                statusDiv.textContent = `成功導入 MIDI，解析出 ${notes.length} 個音符。請點擊渲染。`;
+            } catch (error) {
+                console.error("MIDI 導入失敗:", error);
+                statusDiv.textContent = `MIDI 導入失敗: ${error.message}`;
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+function initialize() {
+    setupListeners();
+    setupMIDIImport();
+    drawRoll(); // 初始繪製
+    updateControlsState(false); // 初始狀態
+}
+
+window.onload = initialize;
+
+</script>
+</body>
+</html>
+
