@@ -6,7 +6,7 @@
 <title>SineVoice - 平假名歌聲合成器 v3.0.4</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-/* ------------------------ 平假名歌聲合成器 v3.0.4 (MIDI寬鬆化) ------------------------ */
+/* ------------------------ 平假名歌聲合成器 v3.0.8 (MIDI寬鬆化) ------------------------ */
 body {
     font-family: 'Inter', sans-serif;
     padding: 10px;
@@ -1617,7 +1617,7 @@ function applyAutoPitchStyle() {
                 { timeOffset: 0.4, freq: n.freq},    // 爬過目標
                 { timeOffset: 0.6, freq: n.freq},           // 回到正常
                 { timeOffset: 0.8, freq: n.freq * 1.0},    // 開始下降
-                { timeOffset: 1.0, freq: n.freq * 2.0}     // 明顯收尾
+                { timeOffset: 1.0, freq: n.freq * 1.5}     // 明顯收尾
             ];
             
             // 音量曲線: 漸強漸弱 (crescendo-decrescendo)
@@ -1640,7 +1640,7 @@ function applyAutoPitchStyle() {
                 { timeOffset: 0.0, freq: prevFreq},   // 銜接凹陷
                 { timeOffset: 0.15, freq: n.freq},   // 接近目標
                 { timeOffset: 0.5, freq: n.freq },           // 中段穩定
-                { timeOffset: 0.8, freq: n.freq * 1.0},    // 尾端上揚
+                { timeOffset: 0.8, freq: n.freq * 1.5},    // 尾端上揚
                 { timeOffset: 1.0, freq: n.freq * 2.0}      // 張力結尾
             ];
             
