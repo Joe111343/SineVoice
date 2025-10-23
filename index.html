@@ -281,109 +281,182 @@ let activePitchPoint = null; // 正在拖動的音高點
 // ------------------------
 // 1. 羅馬拼音/平假名映射和分解 (無變動)
 // ------------------------
-const romajiToKana = { 
-    'a': 'あ', 'i': 'い', 'u': 'う', 'e': 'え', 'o': 'お', 'ka': 'か', 'ki': 'き', 'ku': 'く', 'ke': 'け', 'ko': 'こ', 
-    'sa': 'さ', 'shi': 'し', 'su': 'す', 'se': 'せ', 'so': 'そ', 'ta': 'た', 'chi': 'ち', 'tsu': 'つ', 'te': 'て', 'to': 'と', 
-    'na': 'な', 'ni': 'に', 'nu': 'ぬ', 'ne': 'ね', 'no': 'の', 'ha': 'は', 'hi': 'ひ', 'fu': 'ふ', 'he': 'へ', 'ho': 'ほ', 
-    'ma': 'ま', 'mi': 'み', 'mu': 'む', 'me': 'め', 'mo': 'も', 'ya': 'や', 'yu': 'ゆ', 'yo': 'よ', 'ra': 'ら', 'ri': 'り', 'ru': 'る', 're': 'れ', 'ro': 'ろ', 
-    'wa': 'わ', 'wo': 'を', 'n': 'ん', 'nn': 'ん',
-    'ga': 'が', 'gi': 'ぎ', 'gu': 'ぐ', 'ge': 'げ', 'go': 'ご', 'za': 'ざ', 'ji': 'じ', 'zu': 'ず', 'ze': 'ぜ', 'zo': 'ぞ', 
-    'da': 'だ', 'di': 'ぢ', 'du': 'づ', 'de': 'で', 'do': 'ど', 'ba': 'ば', 'bi': 'び', 'bu': 'ぶ', 'be': 'べ', 'bo': 'ぼ', 
-    'pa': 'ぱ', 'pi': 'ぴ', 'pu': 'ぷ', 'pe': 'ぺ', 'po': 'ぽ', 
-    'kya': 'きゃ', 'kyu': 'きゅ', 'kyo': 'きょ', 'sha': 'しゃ', 'shu': 'しゅ', 'sho': 'しょ', 
-    'cha': 'ちゃ', 'chu': 'ちゅ', 'cho': 'ちょ', 'nya': 'にゃ', 'nyu': 'にゅ', 'nyo': 'にょ', 
-    'hya': 'ひゃ', 'hyu': 'ひゅ', 'hyo': 'ひょ', 'mya': 'みゃ', 'myu': 'みゅ', 'myo': 'みょ', 
-    'rya': 'りゃ', 'ryu': 'りゅ', 'ryo': 'りょ', 'gya': 'ぎゃ', 'gyu': 'ぎゅ', 'gyo': 'ぎょ', 
-    'ja': 'じゃ', 'ju': 'じゅ', 'jo': 'じょ', 'bya': 'びゃ', 'byu': 'びゅ', 'byo': 'びょ', 
-    'pya': 'ぴゃ', 'pyu': 'ぴゅ', 'pyo': 'ぴょ', 
-    'xtsu': 'っ', '-': 'ー',
-}; // --- 完整的漢語拼音基本音節列表（不含聲調） ---
+const romajiToKana = {
+    'a': 'あ', 'i': 'い', 'u': 'う', 'e': 'え', 'o': 'お',
+    'ka': 'か', 'ki': 'き', 'ku': 'く', 'ke': 'け', 'ko': 'こ',
+    'sa': 'さ', 'shi': 'し', 'su': 'す', 'se': 'せ', 'so': 'そ',
+    'ta': 'た', 'chi': 'ち', 'tsu': 'つ', 'te': 'て', 'to': 'と',
+    'na': 'な', 'ni': 'に', 'nu': 'ぬ', 'ne': 'ね', 'no': 'の',
+    'ha': 'は', 'hi': 'ひ', 'fu': 'ふ', 'he': 'へ', 'ho': 'ほ',
+    'ma': 'ま', 'mi': 'み', 'mu': 'む', 'me': 'め', 'mo': 'も',
+    'ya': 'や', 'yu': 'ゆ', 'yo': 'よ',
+    'ra': 'ら', 'ri': 'り', 'ru': 'る', 're': 'れ', 'ro': 'ろ',
+    'wa': 'わ', 'wo': 'を',
+    'n': 'ん', 'nn': 'ん',
+
+    // 濁音
+    'ga': 'が', 'gi': 'ぎ', 'gu': 'ぐ', 'ge': 'げ', 'go': 'ご',
+    'za': 'ざ', 'ji': 'じ', 'zu': 'ず', 'ze': 'ぜ', 'zo': 'ぞ',
+    'da': 'だ', 'di': 'ぢ', 'du': 'づ', 'de': 'で', 'do': 'ど',
+    'ba': 'ば', 'bi': 'び', 'bu': 'ぶ', 'be': 'べ', 'bo': 'ぼ',
+
+    // 半濁音
+    'pa': 'ぱ', 'pi': 'ぴ', 'pu': 'ぷ', 'pe': 'ぺ', 'po': 'ぽ',
+
+    // 拗音 (yōon)
+    'kya': 'きゃ', 'kyu': 'きゅ', 'kyo': 'きょ',
+    'sha': 'しゃ', 'shu': 'しゅ', 'sho': 'しょ',
+    'cha': 'ちゃ', 'chu': 'ちゅ', 'cho': 'ちょ',
+    'nya': 'にゃ', 'nyu': 'にゅ', 'nyo': 'にょ',
+    'hya': 'ひゃ', 'hyu': 'ひゅ', 'hyo': 'ひょ',
+    'mya': 'みゃ', 'myu': 'みゅ', 'myo': 'みょ',
+    'rya': 'りゃ', 'ryu': 'りゅ', 'ryo': 'りょ',
+
+    // 濁拗音
+    'gya': 'ぎゃ', 'gyu': 'ぎゅ', 'gyo': 'ぎょ',
+    'ja': 'じゃ', 'ju': 'じゅ', 'jo': 'じょ',
+    'bya': 'びゃ', 'byu': 'びゅ', 'byo': 'びょ',
+    // 拗半濁音
+    'pya': 'ぴゃ', 'pyu': 'ぴゅ', 'pyo': 'ぴょ',
+
+    // 小元音/非標准輸入
+    'xa': 'ぁ', 'xi': 'ぃ', 'xu': 'ぅ', 'xe': 'ぇ', 'xo': 'ぉ',
+    'la': 'ぁ', 'li': 'ぃ', 'lu': 'ぅ', 'le': 'ぇ', 'lo': 'ぉ',
+    'xya': 'ゃ', 'xyu': 'ゅ', 'xyo': 'ょ',
+    'lya': 'ゃ', 'lyu': 'ゅ', 'lyo': 'ょ',
+    'xtsu': 'っ', 'ltu': 'っ',
+
+    // 促音 (Sokuon) - 重複子音（這是歌詞轉換中最容易「消失」的部分）
+    'kka': 'っか', 'kki': 'っき', 'kku': 'っく', 'kke': 'っけ', 'kko': 'っこ',
+    'ssa': 'っさ', 'sshi': 'っし', 'ssu': 'っす', 'sse': 'っせ', 'sso': 'っそ',
+    'tta': 'った', 'cchi': 'っち', 'ttsu': 'っつ', 'tte': 'って', 'tto': 'っと',
+    'hha': 'っは', 'hhi': 'っひ', 'hfu': 'っふ', 'hhe': 'っへ', 'hho': 'っほ',
+    'mma': 'っま', 'mmi': 'っみ', 'mmu': 'っむ', 'mme': 'っめ', 'mmo': 'っも',
+    'rra': 'っら', 'rri': 'っり', 'rru': 'っる', 'rre': 'っれ', 'rro': 'っろ',
+    'ppa': 'っぱ', 'ppi': 'っぴ', 'ppu': 'っぷ', 'ppe': 'っぺ', 'ppo': 'っぽ',
+    'jja': 'っじゃ', 'jju': 'っじゅ', 'jjo': 'っじょ', // 濁音的促音
+    'ssha': 'っしゃ', 'sshu': 'っしゅ', 'ssho': 'っしょ', // 拗音的促音
+    'ccha': 'っちゃ', 'cchu': 'っちゅ', 'ccho': 'っちょ',
+    
+    // 濁音/半濁音的促音，需要更長的匹配
+    'ggu': 'っぐ', // 範例：baggu -> ばっぐ
+    'bbu': 'っぶ', // 範例：kabbu -> かっぶ
+    'ddu': 'っづ', // 範例：hoddo -> ほっど
+    'zua': 'っざ', // 範例：kizze -> きっぜ
+
+    // 外來語（常用於歌詞）
+    'we': 'ゑ', 'wi': 'ゐ', 
+    'ye': 'いぇ', 
+    'va': 'ゔぁ', 'vi': 'ゔぃ', 'vu': 'ゔ', 've': 'ゔぇ', 'vo': 'ゔぉ',
+
+    // 長音、促音
+    '-': 'ー',
+    '': 'っ', // 這個鍵值必須是空的，交給邏輯處理
+};
+
+// ... (pinyinToChinese 和 keysSorted 保持不變，但請注意 keysSorted 應使用新的 romajiToKana)
+
 const pinyinToChinese = {
-  // A
-  'a': '啊', 'ai': '愛', 'an': '安', 'ang': '昂', 'ao': '奧',
+    // A
+    'a': '啊', 'ai': '愛', 'an': '安', 'ang': '昂', 'ao': '奧',
 
-  // B
-  'ba': '把', 'bai': '白', 'ban': '半', 'bang': '幫', 'bao': '包', 'bei': '北', 'ben': '本', 'beng': '蹦', 'bi': '比', 'bian': '變', 'biao': '表', 'bie': '別', 'bin': '賓', 'bing': '冰', 'bo': '播', 'bu': '不',
+    // B
+    'ba': '把', 'bai': '白', 'ban': '半', 'bang': '幫', 'bao': '包', 'bei': '北', 'ben': '本', 'beng': '蹦', 'bi': '比', 'bian': '變', 'biao': '表', 'bie': '別', 'bin': '賓', 'bing': '冰', 'bo': '播', 'bu': '不',
 
-  // C
-  'ca': '擦', 'cai': '才', 'can': '餐', 'cang': '倉', 'cao': '操', 'ce': '側', 'cen': '參', 'ceng': '層',
-  'cha': '茶', 'chai': '柴', 'chan': '產', 'chang': '長', 'chao': '超', 'che': '車', 'chen': '陳', 'cheng': '城', 'chi': '吃', 'chong': '蟲', 'chou': '抽', 'chu': '出', 'chua': '欻', 'chuai': '揣', 'chuan': '川', 'chuang': '窗', 'chui': '吹', 'chun': '春', 'chuo': '綽',
-  'ci': '詞', 'cong': '從', 'cou': '湊', 'cu': '促', 'cuan': '竄', 'cui': '脆', 'cun': '存', 'cuo': '錯',
+    // C
+    'ca': '擦', 'cai': '才', 'can': '餐', 'cang': '倉', 'cao': '操', 'ce': '側', 'cen': '參', 'ceng': '層',
+    'cha': '茶', 'chai': '柴', 'chan': '產', 'chang': '長', 'chao': '超', 'che': '車', 'chen': '陳', 'cheng': '城', 'chi': '吃', 'chong': '蟲', 'chou': '抽', 'chu': '出', 'chua': '欻', 'chuai': '揣', 'chuan': '川', 'chuang': '窗', 'chui': '吹', 'chun': '春', 'chuo': '綽',
+    'ci': '詞', 'cong': '從', 'cou': '湊', 'cu': '促', 'cuan': '竄', 'cui': '脆', 'cun': '存', 'cuo': '錯',
 
-  // D
-  'da': '大', 'dai': '代', 'dan': '單', 'dang': '當', 'dao': '導', 'de': '的', 'dei': '得', 'deng': '等', 'di': '地', 'dian': '點', 'diao': '掉', 'die': '跌', 'ding': '定', 'diu': '丟', 'dong': '東', 'dou': '都', 'du': '讀', 'duan': '段', 'dui': '對', 'dun': '頓', 'duo': '多',
+    // D
+    'da': '大', 'dai': '代', 'dan': '單', 'dang': '當', 'dao': '導', 'de': '的', 'dei': '得', 'deng': '等', 'di': '地', 'dian': '點', 'diao': '掉', 'die': '跌', 'ding': '定', 'diu': '丟', 'dong': '東', 'dou': '都', 'du': '讀', 'duan': '段', 'dui': '對', 'dun': '頓', 'duo': '多',
 
-  // E
-  'e': '餓', 'ei': '欸', 'en': '恩', 'eng': '鞥', 'er': '兒',
+    // E
+    'e': '餓', 'ei': '欸', 'en': '恩', 'eng': '鞥', 'er': '兒',
 
-  // F
-  'fa': '法', 'fan': '飯', 'fang': '方', 'fei': '飛', 'fen': '分', 'feng': '風', 'fo': '佛', 'fou': '否', 'fu': '副',
+    // F
+    'fa': '法', 'fan': '飯', 'fang': '方', 'fei': '飛', 'fen': '分', 'feng': '風', 'fo': '佛', 'fou': '否', 'fu': '副',
 
-  // G
-  'ga': '嘎', 'gai': '該', 'gan': '幹', 'gang': '剛', 'gao': '高', 'ge': '哥', 'gei': '給', 'gen': '跟', 'geng': '更', 'gong': '工', 'gou': '溝', 'gu': '古', 'gua': '瓜', 'guai': '乖', 'guan': '關', 'guang': '光', 'gui': '貴', 'gun': '滾', 'guo': '國',
+    // G
+    'ga': '嘎', 'gai': '該', 'gan': '幹', 'gang': '剛', 'gao': '高', 'ge': '哥', 'gei': '給', 'gen': '跟', 'geng': '更', 'gong': '工', 'gou': '溝', 'gu': '古', 'gua': '瓜', 'guai': '乖', 'guan': '關', 'guang': '光', 'gui': '貴', 'gun': '滾', 'guo': '國',
 
-  // H
-  'ha': '哈', 'hai': '海', 'han': '漢', 'hang': '航', 'hao': '好', 'he': '河', 'hei': '黑', 'hen': '很', 'heng': '哼', 'hong': '紅', 'hou': '後', 'hu': '湖', 'hua': '花', 'huai': '懷', 'huan': '還', 'huang': '黃', 'hui': '會', 'hun': '混', 'huo': '火',
+    // H
+    'ha': '哈', 'hai': '海', 'han': '漢', 'hang': '航', 'hao': '好', 'he': '河', 'hei': '黑', 'hen': '很', 'heng': '哼', 'hong': '紅', 'hou': '後', 'hu': '湖', 'hua': '花', 'huai': '懷', 'huan': '還', 'huang': '黃', 'hui': '會', 'hun': '混', 'huo': '火',
 
-  // J
-  'ji': '機', 'jia': '家', 'jian': '見', 'jiang': '將', 'jiao': '叫', 'jie': '姐', 'jin': '進', 'jing': '經', 'jiong': '炯', 'jiu': '久', 'ju': '居', 'juan': '捲', 'jue': '覺', 'jun': '軍',
+    // J
+    'ji': '機', 'jia': '家', 'jian': '見', 'jiang': '將', 'jiao': '叫', 'jie': '姐', 'jin': '進', 'jing': '經', 'jiong': '炯', 'jiu': '久', 'ju': '居', 'juan': '捲', 'jue': '覺', 'jun': '軍',
 
-  // K
-  'ka': '卡', 'kai': '開', 'kan': '看', 'kang': '康', 'kao': '考', 'ke': '課', 'ken': '肯', 'keng': '坑', 'kong': '空', 'kou': '口', 'ku': '苦', 'kua': '誇', 'kuai': '快', 'kuan': '寬', 'kuang': '況', 'kui': '虧', 'kun': '困', 'kuo': '闊',
+    // K
+    'ka': '卡', 'kai': '開', 'kan': '看', 'kang': '康', 'kao': '考', 'ke': '課', 'ken': '肯', 'keng': '坑', 'kong': '空', 'kou': '口', 'ku': '苦', 'kua': '誇', 'kuai': '快', 'kuan': '寬', 'kuang': '況', 'kui': '虧', 'kun': '困', 'kuo': '闊',
 
-  // L
-  'la': '拉', 'lai': '來', 'lan': '蘭', 'lang': '朗', 'lao': '老', 'le': '樂', 'lei': '雷', 'leng': '冷', 'li': '力', 'lia': '倆', 'lian': '連', 'liang': '兩', 'liao': '聊', 'lie': '列', 'lin': '林', 'ling': '零', 'liu': '流', 'long': '龍', 'lou': '樓', 'lu': '路', 'lv': '驢', 'luan': '亂', 'lue': '略', 'lun': '論', 'luo': '羅',
+    // L
+    'la': '拉', 'lai': '來', 'lan': '蘭', 'lang': '朗', 'lao': '老', 'le': '樂', 'lei': '雷', 'leng': '冷', 'li': '力', 'lia': '倆', 'lian': '連', 'liang': '兩', 'liao': '聊', 'lie': '列', 'lin': '林', 'ling': '零', 'liu': '流', 'long': '龍', 'lou': '樓', 'lu': '路', 'lv': '驢', 'luan': '亂', 'lue': '略', 'lun': '論', 'luo': '羅',
 
-  // M
-  'ma': '媽', 'mai': '賣', 'man': '滿', 'mang': '忙', 'mao': '貓', 'me': '麼', 'mei': '美', 'men': '門', 'meng': '夢', 'mi': '米', 'mian': '面', 'miao': '秒', 'mie': '滅', 'min': '民', 'ming': '明', 'miu': '謬', 'mo': '摸', 'mou': '某', 'mu': '目',
+    // M
+    'ma': '媽', 'mai': '賣', 'man': '滿', 'mang': '忙', 'mao': '貓', 'me': '麼', 'mei': '美', 'men': '門', 'meng': '夢', 'mi': '米', 'mian': '面', 'miao': '秒', 'mie': '滅', 'min': '民', 'ming': '明', 'miu': '謬', 'mo': '摸', 'mou': '某', 'mu': '目',
 
-  // N
-  'na': '拿', 'nai': '奶', 'nan': '南', 'nang': '囊', 'nao': '腦', 'ne': '呢', 'nei': '內', 'nen': '嫩', 'neng': '能', 'ni': '你', 'nian': '年', 'niang': '娘', 'niao': '鳥', 'nin': '您', 'ning': '寧', 'niu': '牛', 'nong': '農', 'nu': '努', 'nv': '女', 'nuan': '暖', 'nue': '虐',
+    // N
+    'na': '拿', 'nai': '奶', 'nan': '南', 'nang': '囊', 'nao': '腦', 'ne': '呢', 'nei': '內', 'nen': '嫩', 'neng': '能', 'ni': '你', 'nian': '年', 'niang': '娘', 'niao': '鳥', 'nin': '您', 'ning': '寧', 'niu': '牛', 'nong': '農', 'nu': '努', 'nv': '女', 'nuan': '暖', 'nue': '虐',
 
-  // O
-  'o': '哦', 'ou': '歐',
+    // O
+    'o': '哦', 'ou': '歐',
 
-  // P
-  'pa': '怕', 'pai': '排', 'pan': '盤', 'pang': '旁', 'pao': '跑', 'pei': '陪', 'pen': '盆', 'peng': '朋', 'pi': '皮', 'pian': '片', 'piao': '票', 'pie': '撇', 'pin': '品', 'ping': '平', 'po': '破', 'pou': '剖', 'pu': '普',
+    // P
+    'pa': '怕', 'pai': '排', 'pan': '盤', 'pang': '旁', 'pao': '跑', 'pei': '陪', 'pen': '盆', 'peng': '朋', 'pi': '皮', 'pian': '片', 'piao': '票', 'pie': '撇', 'pin': '品', 'ping': '平', 'po': '破', 'pou': '剖', 'pu': '普',
 
-  // Q
-  'qi': '七', 'qia': '洽', 'qian': '千', 'qiang': '強', 'qiao': '橋', 'qie': '切', 'qin': '親', 'qing': '清', 'qiong': '窮', 'qiu': '秋', 'qu': '去', 'quan': '全', 'que': '缺', 'qun': '群',
+    // Q
+    'qi': '七', 'qia': '洽', 'qian': '千', 'qiang': '強', 'qiao': '橋', 'qie': '切', 'qin': '親', 'qing': '清', 'qiong': '窮', 'qiu': '秋', 'qu': '去', 'quan': '全', 'que': '缺', 'qun': '群',
 
-  // R
-  'ran': '然', 'rang': '讓', 'rao': '饒', 're': '熱', 'ren': '人', 'reng': '扔', 'ri': '日', 'rong': '容', 'rou': '肉', 'ru': '入', 'rua': '挼', 'ruai': '搋', 'ruan': '軟', 'rui': '銳', 'run': '閏', 'ruo': '若',
+    // R
+    'ran': '然', 'rang': '讓', 'rao': '饒', 're': '熱', 'ren': '人', 'reng': '扔', 'ri': '日', 'rong': '容', 'rou': '肉', 'ru': '入', 'rua': '挼', 'ruai': '搋', 'ruan': '軟', 'rui': '銳', 'run': '閏', 'ruo': '若',
 
-  // S
-  'sa': '撒', 'sai': '塞', 'san': '三', 'sang': '桑', 'sao': '掃', 'se': '色', 'sen': '森', 'seng': '僧',
-  'sha': '沙', 'shai': '曬', 'shan': '山', 'shang': '上', 'shao': '少', 'she': '舌', 'shei': '誰', 'shen': '深', 'sheng': '生', 'shi': '師', 'shou': '手', 'shu': '書', 'shua': '刷', 'shuai': '帥', 'shuan': '拴', 'shuang': '雙', 'shui': '水', 'shun': '順', 'shuo': '說',
-  'si': '思', 'song': '送', 'sou': '搜', 'su': '速', 'suan': '酸', 'sui': '歲', 'sun': '孫', 'suo': '所',
+    // S
+    'sa': '撒', 'sai': '塞', 'san': '三', 'sang': '桑', 'sao': '掃', 'se': '色', 'sen': '森', 'seng': '僧',
+    'sha': '沙', 'shai': '曬', 'shan': '山', 'shang': '上', 'shao': '少', 'she': '舌', 'shei': '誰', 'shen': '深', 'sheng': '生', 'shi': '師', 'shou': '手', 'shu': '書', 'shua': '刷', 'shuai': '帥', 'shuan': '拴', 'shuang': '雙', 'shui': '水', 'shun': '順', 'shuo': '說',
+    'si': '思', 'song': '送', 'sou': '搜', 'su': '速', 'suan': '酸', 'sui': '歲', 'sun': '孫', 'suo': '所',
 
-  // T
-  'ta': '她', 'tai': '太', 'tan': '談', 'tang': '唐', 'tao': '套', 'te': '特', 'teng': '疼', 'ti': '提', 'tian': '天', 'tiao': '條', 'tie': '鐵', 'ting': '聽', 'tong': '通', 'tou': '頭', 'tu': '圖', 'tuan': '團', 'tui': '推', 'tun': '吞', 'tuo': '脫',
+    // T
+    'ta': '她', 'tai': '太', 'tan': '談', 'tang': '唐', 'tao': '套', 'te': '特', 'teng': '疼', 'ti': '提', 'tian': '天', 'tiao': '條', 'tie': '鐵', 'ting': '聽', 'tong': '通', 'tou': '頭', 'tu': '圖', 'tuan': '團', 'tui': '推', 'tun': '吞', 'tuo': '脫',
 
-  // W
-  'wa': '挖', 'wai': '外', 'wan': '完', 'wang': '王', 'wei': '位', 'wen': '問', 'weng': '翁', 'wo': '我', 'wu': '五',
+    // W
+    'wa': '挖', 'wai': '外', 'wan': '完', 'wang': '王', 'wei': '位', 'wen': '問', 'weng': '翁', 'wo': '我', 'wu': '五',
 
-  // X
-  'xi': '西', 'xia': '下', 'xian': '先', 'xiang': '香', 'xiao': '小', 'xie': '謝', 'xin': '新', 'xing': '星', 'xiong': '熊', 'xiu': '修', 'xu': '許', 'xuan': '選', 'xue': '學', 'xun': '訊',
+    // X
+    'xi': '西', 'xia': '下', 'xian': '先', 'xiang': '香', 'xiao': '小', 'xie': '謝', 'xin': '新', 'xing': '星', 'xiong': '熊', 'xiu': '修', 'xu': '許', 'xuan': '選', 'xue': '學', 'xun': '訊',
 
-  // Y
-  'ya': '壓', 'yan': '言', 'yang': '羊', 'yao': '要', 'ye': '也', 'yi': '一', 'yin': '音', 'ying': '英', 'yong': '用', 'you': '有', 'yu': '雨', 'yuan': '遠', 'yue': '月', 'yun': '雲',
+    // Y
+    'ya': '壓', 'yan': '言', 'yang': '羊', 'yao': '要', 'ye': '也', 'yi': '一', 'yin': '音', 'ying': '英', 'yong': '用', 'you': '有', 'yu': '雨', 'yuan': '遠', 'yue': '月', 'yun': '雲',
 
-  // Z
-  'za': '雜', 'zai': '再', 'zan': '暫', 'zang': '髒', 'zao': '早', 'ze': '責', 'zei': '賊', 'zen': '怎', 'zeng': '增',
-  'zha': '炸', 'zhai': '摘', 'zhan': '戰', 'zhang': '張', 'zhao': '照', 'zhe': '這', 'zhen': '真', 'zheng': '正', 'zhi': '只', 'zhong': '中', 'zhou': '周', 'zhu': '主', 'zhua': '抓', 'zhuai': '拽', 'zhuan': '轉', 'zhuang': '壯', 'zhui': '追', 'zhun': '準', 'zhuo': '桌',
-  'zi': '子', 'zong': '總', 'zou': '走', 'zu': '組', 'zuan': '鑽', 'zui': '最', 'zun': '遵', 'zuo': '做'
+    // Z
+    'za': '雜', 'zai': '再', 'zan': '暫', 'zang': '髒', 'zao': '早', 'ze': '責', 'zei': '賊', 'zen': '怎', 'zeng': '增',
+    'zha': '炸', 'zhai': '摘', 'zhan': '戰', 'zhang': '張', 'zhao': '照', 'zhe': '這', 'zhen': '真', 'zheng': '正', 'zhi': '只', 'zhong': '中', 'zhou': '周', 'zhu': '主', 'zhua': '抓', 'zhuai': '拽', 'zhuan': '轉', 'zhuang': '壯', 'zhui': '追', 'zhun': '準', 'zhuo': '桌',
+    'zi': '子', 'zong': '總', 'zou': '走', 'zu': '組', 'zuan': '鑽', 'zui': '最', 'zun': '遵', 'zuo': '做'
 };
 
 const keysSorted = Object.keys(romajiToKana).sort((a,b)=>b.length-a.length);
-const specialKanaMap = { 
-    'きゃ': '拗音', 'きゅ': '拗音', 'きょ': '拗音', 'しゃ': '拗音', 'しゅ': 'しゅ', 'しょ': 'しょ', 
-    'ちゃ': '拗音', 'ちゅ': 'ちゅ', 'ちょ': 'ちょ', 'にゃ': 'にゃ', 'にゅ': 'にゅ', 'にょ': 'にょ', 
-    'ひゃ': '拗音', 'ひゅ': 'ひゅ', 'ひょ': 'ひょ', 'みゃ': 'みゃ', 'みゅ': 'みゅ', 'みょ': 'みょ', 
-    'りゃ': '拗音', 'りゅ': 'りゅ', 'りょ': 'りょ', 'ぎゃ': 'ぎゃ', 'ぎゅ': 'ぎゅ', 'ぎょ': 'ぎょ', 
-    'じゃ': '拗音', 'じゅ': 'じゅ', 'じょ': 'じょ', 'びゃ': '拗音', 'びゅ': 'びゅ', 'びょ': 'びょ', 
-    'ぴゃ': '拗音', 'ぴゅ': 'ぴゅ', 'ぴょ': 'ぴょ', 
-    'っ': '促音', 'ー': '長音', 'ん': '撥音',
+const specialKanaMap = {
+    // 小元音
+    'ぁ': '小元音', 'ぃ': '小元音', 'ぅ': '小元音', 'ぇ': '小元音', 'ぉ': '小元音',
+    // 拗音
+    'きゃ': '拗音', 'きゅ': '拗音', 'きょ': '拗音',
+    'しゃ': '拗音', 'しゅ': '拗音', 'しょ': 'しょ',
+    'ちゃ': '拗音', 'ちゅ': 'ちゅ', 'ちょ': 'ちょ',
+    'にゃ': '拗音', 'にゅ': 'にゅ', 'にょ': 'にょ',
+    'ひゃ': '拗音', 'ひゅ': 'ひゅ', 'ひょ': 'ひょ',
+    'みゃ': '拗音', 'みゅ': 'みゅ', 'みょ': 'みょ',
+    'りゃ': '拗音', 'りゅ': 'りゅ', 'りょ': 'りょ',
+    'ぎゃ': '拗音', 'ぎゅ': 'ぎゅ', 'ぎょ': 'ぎょ',
+    'じゃ': '拗音', 'じゅ': 'じゅ', 'じょ': 'じょ',
+    'びゃ': '拗音', 'びゅ': 'びゅ', 'びょ': 'びょ',
+    'ぴゃ': '拗音', 'ぴゅ': 'ぴゅ', 'ぴょ': 'ぴょ',
+    // 小的「や」「ゆ」「よ」
+    'ゃ': '小y音', 'ゅ': '小y音', 'ょ': '小y音',
+    // 促音、長音、撥音
+    'っ': '促音',
+    'ー': '長音',
+    'ん': '撥音',
+    // 其他
+    'ゐ': '舊假名', 'ゑ': '舊假名', 'ゔ': '外來語',
 };
 function parseText(input) {
     let text = input.toLowerCase().trim();
@@ -1483,100 +1556,153 @@ function applyAutoPitchStyle() {
         return;
     }
 
-    console.log('=== 開始套用自動智能音高 ===');
+    console.log('=== 開始套用自動智能音高 + 動態音量 ===');
 
-    // 固定參數
-    const VIBRATO_RATE = 5.3;       // Hz (固定顫音速率)
-    const VIBRATO_DEPTH_BASE = 10;  // cents (基礎顫音深度,範圍 5~20)
+    const VIBRATO_RATE = 0;
+    const VIBRATO_DEPTH_BASE = 0;  // 增強顫音
 
     for (let i = 0; i < notes.length; i++) {
         const n = notes[i];
         
-        // 檢查音符基礎屬性
         if (!n.freq || !n.dur) {
             console.warn(`音符${i}缺少基礎屬性`);
             continue;
         }
         
-        // 獲取前後音符頻率(用於平滑過渡)
         const prevFreq = (i > 0 && notes[i-1].freq) ? notes[i-1].freq : n.freq;
         const nextFreq = (i < notes.length - 1 && notes[i+1].freq) ? notes[i+1].freq : n.freq;
         
-        // ===== 音符類型判斷 =====
-        const isShort = n.dur < 0.25;   // 短促音符(< 0.25秒)
-        const isLong = n.dur > 0.8;     // 長音(> 0.8秒)
+        const isShort = n.dur < 0.25;
+        const isLong = n.dur > 0.8;
         const hasRestAfter = i < notes.length - 1 && 
-                            (notes[i+1].time - (n.time + n.dur)) > 0.05; // 後面有休止符
-        const isAccented = n.vel && n.vel > 0.8; // 重音(力度 > 0.8)
+                            (notes[i+1].time - (n.time + n.dur)) > 0.05;
+        const isAccented = n.vel && n.vel > 0.8;
 
-        // ===== 基礎顫音設定 =====
         n.vibratoEnabled = true;
         n.vibratoRate = VIBRATO_RATE;
         
-        // ===== 根據音符類型應用不同的音高曲線 =====
+        // ========================================
+        // 音高曲線 (pitchPoints)
+        // ========================================
         
         if (isShort) {
-            // 【規則1】短促音符: 自動微抖,增添活力感
-            n.vibratoDepth = 15; // 較強的顫音(5~20 cents)
+            // 短促音符: 快速抖動
+            n.vibratoDepth = 0;
             
             n.pitchPoints = [
-                { timeOffset: 0.0, freq: prevFreq * 0.995 },  // 銜接處微幅凹下
-                { timeOffset: 0.5, freq: n.freq },            // 中段保持平穩
-                { timeOffset: 1.0, freq: n.freq * 0.998 }     // 尾端略微下降(收束感)
+                { timeOffset: 0.0, freq: prevFreq * 0.0 },   // 從很低開始
+                { timeOffset: 0.15, freq: n.freq  * 1.0},    // 快速衝高
+                { timeOffset: 0.5, freq: n.freq  * 1.0},           // 中段穩定
+                { timeOffset: 0.85, freq: n.freq * 1.0},    // 再次上揚
+                { timeOffset: 1.0, freq: n.freq * 1.0}      // 快速下降
             ];
             
-            console.log(`音符${i}: 短促音符(${n.dur.toFixed(2)}s) - 活力微抖`);
+            // 音量曲線: 快速爆發
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.1 },              // 輕柔開始
+                { timeOffset: 0.1, gain: 1.0 },              // 快速爆發
+                { timeOffset: 0.4, gain: 0.8 },              // 中段維持
+                { timeOffset: 1.0, gain: 0.05 }              // 快速消失
+            ];
+            
+            console.log(`音符${i}: 短促 - 爆發式`);
             
         } else if (isLong) {
-            // 【規則3】長音: 開頭從低向高緩慢過渡,尾端略微下降
-            n.vibratoDepth = 12; // 中等顫音
+            // 長音: 緩慢變化
+            n.vibratoDepth = 0;
             
             n.pitchPoints = [
-                { timeOffset: 0.0, freq: n.freq * 0.985 },   // 從低開始(增加自然延展感)
-                { timeOffset: 0.25, freq: n.freq },          // 緩慢升至目標音高
-                { timeOffset: 0.75, freq: n.freq },          // 中段保持平穩
-                { timeOffset: 1.0, freq: n.freq * 0.992 }    // 尾端略微下降(帶出收束感)
+                { timeOffset: 0.0, freq: n.freq},    // 從低開始
+                { timeOffset: 0.2, freq: n.freq},    // 緩慢上升
+                { timeOffset: 0.4, freq: n.freq},    // 爬過目標
+                { timeOffset: 0.6, freq: n.freq},           // 回到正常
+                { timeOffset: 0.8, freq: n.freq * 1.0},    // 開始下降
+                { timeOffset: 1.0, freq: n.freq * 2.0}     // 明顯收尾
             ];
             
-            console.log(`音符${i}: 長音(${n.dur.toFixed(2)}s) - 低起高收`);
+            // 音量曲線: 漸強漸弱 (crescendo-decrescendo)
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.2 },              // 輕柔開始
+                { timeOffset: 0.15, gain: 0.5 },             // 逐漸增強
+                { timeOffset: 0.35, gain: 1.2 },             // 達到高峰
+                { timeOffset: 0.65, gain: 1.0 },             // 維持力度
+                { timeOffset: 0.85, gain: 0.6 },             // 開始減弱
+                { timeOffset: 1.0, gain: 0.1 }               // 輕柔結束
+            ];
+            
+            console.log(`音符${i}: 長音 - 漸強漸弱`);
             
         } else {
-            // 【規則2,7,8】普通音符: 中段平穩 + 平滑過渡 + 尾端小幅上揚
-            n.vibratoDepth = VIBRATO_DEPTH_BASE; // 標準顫音(10 cents)
+            // 普通音符: 標準表現力
+            n.vibratoDepth = 5;
             
             n.pitchPoints = [
-                { timeOffset: 0.0, freq: prevFreq * 0.997 }, // 銜接處微幅凹下(自然過渡弧線)
-                { timeOffset: 0.3, freq: n.freq },           // 平滑過渡到目標音高
-                { timeOffset: 0.7, freq: n.freq },           // 中段保持平穩,避免突兀跳動
-                { timeOffset: 1.0, freq: n.freq * 1.002 }    // 尾端音高小幅上揚(輕微張力)
+                { timeOffset: 0.0, freq: prevFreq},   // 銜接凹陷
+                { timeOffset: 0.15, freq: n.freq},   // 接近目標
+                { timeOffset: 0.5, freq: n.freq },           // 中段穩定
+                { timeOffset: 0.8, freq: n.freq * 1.0},    // 尾端上揚
+                { timeOffset: 1.0, freq: n.freq * 2.0}      // 張力結尾
             ];
             
-            console.log(`音符${i}: 普通音符(${n.dur.toFixed(2)}s) - 標準處理`);
+            // 音量曲線: 自然起伏
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.3 },              // 柔和起音
+                { timeOffset: 0.2, gain: 0.9 },              // 快速到達
+                { timeOffset: 0.7, gain: 0.85 },             // 穩定維持
+                { timeOffset: 1.0, gain: 0.2 }               // 自然收尾
+            ];
+            
+            console.log(`音符${i}: 普通 - 自然表現`);
         }
 
-        // 【規則9】休止符附近: 音高微幅波動,營造呼吸感
+        // ========================================
+        // 特殊情況處理
+        // ========================================
+        
+        // 休止符: 呼吸感 (音高下降 + 音量快速消失)
         if (hasRestAfter) {
-            const lastPoint = n.pitchPoints[n.pitchPoints.length - 1];
-            lastPoint.freq *= 0.994; // 休止前微幅下降
-            console.log(`  └ 休止符前 - 營造呼吸感`);
+            n.pitchPoints[n.pitchPoints.length - 1].freq *= 0.75; // 音高大幅下降
+            n.volumePoints[n.volumePoints.length - 1].gain = 0.01; // 幾乎靜音
+            console.log(`  └ 休止符前 - 呼吸感`);
         }
 
-        // 【規則10】重音處: 加強音高變化,使表現更生動
+        // 重音: 極度強化 (音高變化大 + 音量爆發)
         if (isAccented) {
-            n.vibratoDepth = 18; // 加強顫音深度(接近上限 20 cents)
-            n.pitchPoints[0].freq *= 0.993;  // 起始凹陷更深
-            n.pitchPoints[n.pitchPoints.length - 1].freq *= 1.005; // 尾端張力更強
-            console.log(`  └ 重音 - 加強變化`);
+            n.vibratoDepth = 0; // 最強顫音
+            
+            // 音高: 更深的凹陷 + 更強的張力
+            n.pitchPoints[0].freq *= 0.8;  // 起始深度凹陷
+            n.pitchPoints[n.pitchPoints.length - 1].freq *= 1.15; // 尾端強烈張力
+            
+            // 音量: 爆發式強調
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.5 },              // 較強起音
+                { timeOffset: 0.05, gain: 2.0 },             // 瞬間爆發！
+                { timeOffset: 0.3, gain: 1.5 },              // 維持強度
+                { timeOffset: 0.7, gain: 1.2 },              // 持續有力
+                { timeOffset: 1.0, gain: 0.3 }               // 有力收尾
+            ];
+            
+            console.log(`  └ 重音 - 爆發強化`);
+        }
+        
+        // ========================================
+        // 確保至少有基礎點
+        // ========================================
+        if (!n.volumePoints || n.volumePoints.length < 2) {
+            n.volumePoints = [
+                { timeOffset: 0.0, gain: 0.5 },
+                { timeOffset: 1.0, gain: 0.5 }
+            ];
         }
     }
     
-    console.log('=== 自動智能音高套用完成 ===');
+    console.log('=== 自動智能音高 + 動態音量套用完成 ===');
     
-    // 更新顯示
     drawRollAndPreserveScroll();
     renderedAudioBuffer = null;
     updateControlsState(false);
-    statusDiv.textContent = '已套用「自動智能」音高風格。請點擊渲染按鈕。';
+    statusDiv.textContent = '已套用「自動智能(音高+音量)」風格。請點擊渲染。';
 }
 
 
@@ -1622,7 +1748,7 @@ function applyPitchStyle(style) {
         // 預設顫音設定
         n.vibratoEnabled = true;
         n.vibratoRate = 5;
-        n.vibratoDepth = 10;
+        n.vibratoDepth = 5;
         
         switch (style) {
             case 'default':
